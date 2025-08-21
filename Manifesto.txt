@@ -1,0 +1,12 @@
+int q(int c){
+   int a;
+   int a = c;
+   return a;
+} 
+
+int g(int w){
+    int a = q(2);
+    return a + w;
+}
+
+g(9);
