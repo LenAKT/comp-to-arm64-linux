@@ -1,0 +1,6 @@
+# Ignore macOS cruft
+.DS_Store
+
+# Ignore object/dependency files
+*.o
+*.d
