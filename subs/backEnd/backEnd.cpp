@@ -1,4 +1,5 @@
 #include "backEnd.h"
+#include <set>
 
 std::string toString(Instruction instr) {
     switch (instr) {
@@ -9,6 +10,8 @@ std::string toString(Instruction instr) {
         case Instruction::Arithma:    return "Arithma";
         case Instruction::ChangeSc:   return "ChangeSc";
         case Instruction::getFuncVal: return "getFuncVal";
+        case Instruction::getBool: return "getBool";
+        case Instruction::boolReturn: return "BoolReturn";
         default: return "Unknown";
     }
 }
@@ -67,12 +70,11 @@ void backEnd::start(){
                 makeFunction(std::static_pointer_cast<DeclareFunction>(i)->name);
             break;
         case Instruction::DecVar:{
-
                 auto d = std::static_pointer_cast<DeclareVar>(i);
                 makeVar(d->toDeclare, d->value, d->name);
             break;}
         case Instruction::RetValue:
-                forceTakeR(0);
+                // forceTakeR(0);
                 moveToReg(scope->Cvars["return"], 0);
                 outFile << "ret" << std::endl;
             break;
@@ -83,19 +85,27 @@ void backEnd::start(){
                 ArithmaFunction(std::static_pointer_cast<ArIr>(i), std::static_pointer_cast<ArIr>(i)->isL);
             break;
         case Instruction::getFuncVal:{
-               runner(i);
+                int adr = findNextFree(cReg);
+               runner(i, adr);
+               std::static_pointer_cast<getFuncVal>(i)->reg = adr;
             break;}
+        case Instruction::getBool:
+                boolFunction(std::static_pointer_cast<getBool>(i));
+              break;
+        case Instruction::boolReturn:
+            outFile << "skip" << labelCounter <<":" << std::endl;
+            labelCounter++;
         default:
             break;
         }
     }
 }
 
-void backEnd::runner(std::shared_ptr<IrNode> i){
-     auto s = std::static_pointer_cast<getFuncVal>(i);
+void backEnd::runner(std::shared_ptr<IrNode> i, int newAdr){
+    auto s = std::static_pointer_cast<getFuncVal>(i);
     for (int i = 0; i < s->params.size(); i++)
     {
-        forceTakeR(i);
+        if(FuRegs.regs[i] == true){forceTakeR(i);}
         switch (s->params[i].cat)
         {
         case TokenCategory::NUMBER:
@@ -103,15 +113,17 @@ void backEnd::runner(std::shared_ptr<IrNode> i){
             break;
         case TokenCategory::VARIABLE:
             outFile << "mov x" << i << ", x" << scope->Cvars[s->params[i].stringValue]->reg << std::endl;
+            break;
         default:
             break;
         }
     }
     outFile << "bl " << s->name << std::endl;
-    int newAdr = findNextFree(&STMregs);
+    clearRegs(&FuRegs);
+    clearRegs(&STMregs);
     outFile << "mov x" << newAdr << ", x0" << std::endl;
     scope->Cvars[s->callerName]->reg = newAdr;
-    FuRegs[0] = false;
+    FuRegs.regs[0] = false;
 }
 
 void backEnd::moveToReg(std::shared_ptr<Cvar> var, int reg){
@@ -119,8 +131,11 @@ void backEnd::moveToReg(std::shared_ptr<Cvar> var, int reg){
 }
 
 void backEnd::makeVar(std::shared_ptr<Cvar> var, std::shared_ptr<valueNode> node, std::string name){
-    var->reg = findNextFree(&STMregs);
     var->value = node;
+    if (var->reg == 99)
+    {
+        var->reg = findNextFree(cReg);
+    }
     switch (var->value->type)
     {
     case valueType::Intager:
@@ -129,21 +144,20 @@ void backEnd::makeVar(std::shared_ptr<Cvar> var, std::shared_ptr<valueNode> node
     case valueType::Varible:
         movFunc(Mode::varValue, var, scope->Cvars[std::static_pointer_cast<variableNode>(var->value)->name]);
     break;
-    case valueType::Operator:{
-        // auto p = std::static_pointer_cast<operatorNode>(var->value);
-        // std::shared_ptr<ArIr> arIr = std::make_shared<ArIr>();
-        // arIr->c = p->c;
-        // arIr->l = p->l;
-        // arIr->caller = name;
-        // arIr->r = p->r;
-        // ArithmaFunction(arIr);
-        break;}
+    case valueType::Operator:
+        break;
+    case valueType::Func:
+
+        break;
     default:
         break;
     }
 }
 
 void backEnd::makeFunction(std::string name){
+    if (scope->functionMap.size() > 0){cReg = &LTMregs;}
+    else{cReg = &STMregs;}
+    
     if (name == "main")
     {
          outFile << ".global _start\n_start:" << std::endl;
@@ -152,11 +166,11 @@ void backEnd::makeFunction(std::string name){
         outFile << ".global " << name << "\n.type " << name << ", %function\n" << name << ":" << std::endl;
     }
     int in = 0;
-    for (auto i : scope->functionMap[name]->paramOrder){
+    for (auto i : outerSCope->functionMap[name]->paramOrder){
         if (in < 8)
         {
-            scope->functionMap[name]->scope->Cvars[i]->reg = in;
-            FuRegs[in] = true;
+            outerSCope->functionMap[name]->scope->Cvars[i]->reg = in;
+            FuRegs.regs[in] = true;
             in++;
         }
         else{
@@ -166,12 +180,12 @@ void backEnd::makeFunction(std::string name){
     }
 }
 
-int backEnd::findNextFree(std::vector<bool>* r){
-   for (int i = 0; i < r->size(); i++)
+int backEnd::findNextFree(Reg* r){
+   for (int i = r->start; i < r->end; i++)
    {
-        if ((*r)[i] == false)
+        if (r->regs[i] == false)
         {
-            (*r)[i] = true;
+            r->regs[i] = true;
             return i;
         }
    }
@@ -179,16 +193,16 @@ int backEnd::findNextFree(std::vector<bool>* r){
 }
 
 void backEnd::forceTakeR(int a){
-    if (FuRegs[a] == true)
+    if (FuRegs.regs[a] == true)
     {
-        int m = findNextFree(&STMregs);
+        int m = findNextFree(cReg);
         for(auto s : scope->Cvars){
             if (s.second->reg == a)
             {
                 s.second->reg = m;
             }
         }
-        FuRegs[a] = false;
+        FuRegs.regs[a] = false;
         outFile << "mov x" << m << ", x" << a << std::endl;
     }
 }
@@ -219,9 +233,10 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
    VarType type;
     if (ir->caller == "")
     {
-        toReg = findNextFree(&STMregs);
+        toReg = findNextFree(cReg);
         type = scope->Cvars[std::static_pointer_cast<operatorNode>(ir->parent)->name]->var.type;
         std::shared_ptr<regOnlyNode> re = std::make_shared<regOnlyNode>();
+        delteRegs.insert(toReg);
         re->reg = toReg;
         for (int i = 0; i < Ir->size(); i++)
         {
@@ -265,17 +280,11 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
             auto s = std::static_pointer_cast<functionNode>(node);
             if(type == scope->functionMap[s->name]->returnType)
             {
-                forceTakeR(0);
-                std::shared_ptr<getFuncVal> v = std::make_shared<getFuncVal>();
-                v->name = s->name;
-                v->params = s->paramVars;
-                v->callerName = "void";
-                runner(v);
-                *currentReg = 0;
+                *currentReg = *s->reg;
+                delteRegs.insert(*s->reg);
                 return true;
             }
             else{
-                std::cout << "Arithmatic error 2" << std::endl;
                 exit(1);
                 return false;
             }
@@ -287,9 +296,10 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
                 {
                     std::shared_ptr<Cvar> c = std::make_shared<Cvar>();
                     c->value = node;
-                    c->reg = findNextFree(&STMregs);
+                    c->reg = findNextFree(cReg);
                     movFunc(Mode::intValue, c, nullptr);
                     *currentReg = c->reg;
+                    delteRegs.insert(c->reg);
                 }
                 else {
                     if (i == 0){trueVal = &std::static_pointer_cast<intNode>(node)->value;}
@@ -316,6 +326,8 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
         currentReg = &rightReg;
         isGood = check(ir->r);
     }
+    if (trueVal != nullptr){leftReg = *trueVal;}
+    if(trueValR != nullptr){rightReg = *trueValR;}
     if (isGood)
     {        
         switch (type)
@@ -328,8 +340,7 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
                     std::swap(trueVal, trueValR);
                     std::swap(leftReg, rightReg);
                 }
-                outFile << ((trueVal != nullptr) ? *trueVal : leftReg)
-                << ", " << ((trueValR != nullptr) ? "#" : "w") << ((trueValR != nullptr) ? *trueValR : rightReg) << std::endl;
+                outFile << leftReg << ", " << ((trueValR != nullptr) ? "#" : "w") << rightReg << std::endl;
             break;}
         case VarType::String:
             break;
@@ -337,4 +348,55 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
             break;
         }
     }
+    auto d = [&](int reg){
+        if (delteRegs.erase(reg))
+        {
+            cReg->regs.at(reg-cReg->start) = false;
+        }
+    };
+    d(leftReg);
+    d(rightReg);
+}
+
+void backEnd::clearRegs(Reg* r){
+    for (int i = 0; i < r->end-r->start; i++)
+    {
+        r->regs[i] = false;
+    }
+}
+
+void backEnd::boolFunction(std::shared_ptr<getBool> b){
+    std::cout << "que " << static_cast<int>(b->type) << " " << b->subBools.size() << std::endl;
+   switch (b->type)
+   {
+   case BoolEnum::IF:
+        for(auto i : b->subBools){
+            if (i.isBool)
+            {
+                movFunc(Mode::intValue, i.firstArg, nullptr);
+                outFile << "cbz w" << i.firstArg->reg << ", skip" << labelCounter << std::endl;
+                cReg->regs[i.firstArg->reg] = false;
+            }
+            else{
+                if(i.firstArg->reg == 99){
+                    i.firstArg->reg = findNextFree(&STMregs);
+                    movFunc(Mode::intValue, i.firstArg, nullptr);
+                }
+                if(i.secondArg->reg == 99){
+                    i.secondArg->reg = findNextFree(&STMregs);
+                    movFunc(Mode::intValue, i.secondArg, nullptr);
+                    }
+                outFile << "cmp w" << i.firstArg->reg << ", w" << i.secondArg->reg << std::endl;
+                auto g = arm64BoolOps.find(i.boolArg.stringValue);
+                outFile << "b." << g->second << " skip" << labelCounter << std::endl;
+                cReg->regs[i.firstArg->reg] = false;
+                cReg->regs[i.secondArg->reg] = false;
+            }
+        }
+    break;
+   
+   default:
+    break;
+   }
+    
 }

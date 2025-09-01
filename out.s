@@ -5,27 +5,53 @@ q:
 mov w10, #2
 mul w9, w10, w0
 add w11, w9, #6
-mul w12, w0, w11
-mov w13, w12
-mov x14, x0
-mov w0, w13
+mov w12, w11
+mov w0, w12
 ret
 .global g
 .type g, %function
 g:
-mov w15, #4
-mov x16, x0
-mov x0, x15
+mov x20, x0
+mov x0, #4
 bl q
-mov x17, x0
-add w19, w18, w16
-mov w0, w19
+mov x19, x0
+mov x0, x20
+bl q
+mov x21, x0
+add w22, w19, w21
+add w23, w22, w20
+mov w0, w23
+ret
+.global h
+.type h, %function
+h:
+mov w25, #2
+mul w24, w0, w25
+mov x27, x0
+mov x0, x24
+bl q
+mov x26, x0
+cmp w24, w26
+b.lt skip0
+sub w26, w26, w24
+skip0:
+mov w13, #50
+cmp w26, w13
+b.lt skip1
+add w26, w26, #1
+skip1:
+mov w24, w26
+mov w0, w24
 ret
 .global _start
 _start:
-mov x0, #3
+mov x0, #5
 bl g
-mov x20, x0
-mov w22, #0
-mov w0, w22
+mov x26, x0
+mov x0, #5
+bl q
+mov x28, x0
+add w28, w26, w28
+mov w29, w28
+mov w0, w29
 ret

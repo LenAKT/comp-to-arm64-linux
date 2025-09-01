@@ -19,6 +19,7 @@ class reading
     std::vector<std::string> order;
     shared_ptr<Scope> scope = make_shared<Scope>();
     std::vector<preToken> preTokens;
+    int semiCount = 0;
     private:
     string mainMemory;
 };

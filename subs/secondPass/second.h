@@ -5,6 +5,7 @@
 
 struct parseLogic
 {
+    bool setBool = false;
     bool collecting = false;
     bool runFunction = false;
     bool setvalue = false;
@@ -36,6 +37,7 @@ class Second
     std::shared_ptr<valueNode> Intfolder(const std::shared_ptr<operatorNode>& node);
     std::shared_ptr<valueNode> startFold(const std::shared_ptr<operatorNode>& v, std::string, bool );
     std::shared_ptr<valueNode> stringfolder(const std::shared_ptr<operatorNode>& node);
+    void makeBool(std::vector<preToken>& buffer, BoolEnum);
 
     void delimiterHandlign(std::vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i);
     std::shared_ptr<functionNode> functionHandling(std::vector<preToken>& b, std::shared_ptr<NFunction>& n, std::string );

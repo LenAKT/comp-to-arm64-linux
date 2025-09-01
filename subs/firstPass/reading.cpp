@@ -133,6 +133,7 @@ void reading::firstPass(){
                         order.clear();
                         variableAssigning(nFunction->paramMap, scope->functionMap, buffer);
                         nFunction->scope->variableMap = nFunction->paramMap;
+                        nFunction->scope->functionMap.clear();
                         nFunction->paramOrder = order;
                         inParams = false;
                         buffer.clear();
@@ -150,15 +151,27 @@ void reading::firstPass(){
                     break;
                 }
                 case Delimiter::BraceOpen:{
-                    inFunction = true;
-                    scope = nFunction->scope;
+                    if (semiCount == 0)
+                    {
+                        semiCount++;
+                        inFunction = true;
+                        scope = nFunction->scope;
+                    }
+                    else{
+                        semiCount++;
+                    }
+                    
                     break;
                 }
                 case Delimiter::BraceClose:{
-                    scope = nFunction->parentScope;
-                    scope->functionMap.emplace(std::make_pair(nFunction->name,std::move(nFunction)));
-                    nFunction = nullptr;
-                    inFunction = false;
+                    semiCount--;
+                    if (semiCount == 0)
+                    {
+                        scope = nFunction->parentScope;
+                        scope->functionMap.emplace(std::make_pair(nFunction->name,std::move(nFunction)));
+                        nFunction = nullptr;
+                        inFunction = false;
+                    }
                     break;
                 }
                 default:

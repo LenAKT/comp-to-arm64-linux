@@ -41,6 +41,9 @@ const std::unordered_map<std::string, TokenCategory> broadTokenMap = {
     {",", TokenCategory::DELIMITER},
     {";", TokenCategory::DELIMITER},
     {"\"", TokenCategory::DELIMITER},
+
+    {"&&", TokenCategory::BOOLOP},
+    {"||", TokenCategory::BOOLOP},
 };
 
  const std::unordered_map<std::string, VarType> identifierMap = {
@@ -85,4 +88,13 @@ const std::unordered_map<char, std::string> arm64Ops = {
     {'/',  "sdiv"},     // signed integer division
     {'%',  "srem"},     // signed integer remainder (modulus)
     {'=',  "mov"}       // assignment → move value to register
+};
+
+const std::unordered_map<std::string, std::string> arm64BoolOps = {
+    {"<",  "lt"},   // less than
+    {"<=", "le"},   // less than or equal
+    {">",  "gt"},   // greater than
+    {">=", "ge"},   // greater than or equal
+    {"==", "eq"},   // equal
+    {"!=", "ne"}    // not equal
 };

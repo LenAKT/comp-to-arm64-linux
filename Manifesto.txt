@@ -1,16 +1,28 @@
 int q(int c){
-   int b = 2*3+2*c;
-   int a = c * b;
-   return a;
-} 
+    int b = 2*3 + 2*c;
+    return b;
+}
 
 int g(int w){
-    int d = 4;
-    int a = q(d);
-    return a + w;
+    int a = q(4);       
+    int e = q(w);       
+    int f = a + e;      
+    return f + w;
+}
+
+int h(int x){
+    int y = x * 2;      
+    int z = q(y);       
+    if (y < z){         
+        z = z - y;
+    }
+    if (z < 50){        
+        z = z + 1;
+    }
+    return z;
 }
 
 int main(){
-    int b = g(3)*(g4);
-    return 0;
+    int a = g(5) + q(5);  
+    return a;
 }

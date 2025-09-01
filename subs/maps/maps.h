@@ -60,7 +60,8 @@ enum class TokenCategory {
     NUMBER,
     PREFIX,
     STRING,
-    NONE
+    NONE,
+    BOOLOP
 };
 extern const std::unordered_map<std::string, Prefix> prefixMap;
 
@@ -74,7 +75,7 @@ extern const std::unordered_map<std::string, OperatorType> operatorMap;
 
 extern const std::unordered_map<char, std::string> arm64Ops;
 
-
+extern const std::unordered_map<std::string, std::string> arm64BoolOps;
 
 struct preToken
 {
@@ -123,6 +124,7 @@ struct Scope{
     std::unordered_map<std::string, Variable> variableMap;
     std::vector<std::string> insertioOrder;
     std::unordered_map<std::string, std::shared_ptr<Cvar>> Cvars;
+    std::shared_ptr<Scope> parentS;
 };
 
 struct valueNode
@@ -172,6 +174,7 @@ struct functionNode : valueNode
     functionNode() {type = valueType::Func;}
     std::vector<preToken> paramVars;
     std::string name;
+    int* reg;
     void print() override{
         std::cout << name;
     }
@@ -193,6 +196,8 @@ enum class Instruction{
     Arithma,
     ChangeSc,
     getFuncVal,
+    getBool,
+    boolReturn,
 };
 
 struct IrNode{
@@ -218,6 +223,7 @@ struct getFuncVal : IrNode
     getFuncVal(){ instruction = Instruction::getFuncVal;}
     std::string name;
     std::vector<preToken> params;
+    int reg;
     std::string callerName;
 };
 
@@ -236,6 +242,32 @@ struct ArIr : IrNode{
 };
 
 struct ChangeScp : IrNode{
-    ChangeScp() {instruction = Instruction::ChangeSc;}
+    ChangeScp() {instruction = Instruction::ChangeSc; std::cout << "changing scope" << std::endl;}
     std::shared_ptr<Scope> newScope;
+};
+
+struct boolrig{
+    bool isBool = false;
+    std::shared_ptr<Cvar> firstArg;
+    std::shared_ptr<Cvar> secondArg;
+    preToken boolArg;
+    preToken nextCmpr;
+    int reg;
+};
+
+enum class BoolEnum{
+    IF,
+    WHILE,
+    ELSE,
+    Else_If,
+};
+struct getBool : IrNode{
+    getBool() {instruction = Instruction::getBool;}
+    BoolEnum type;
+    std::shared_ptr<Scope> bscope;
+    std::vector<boolrig> subBools;
+};
+
+struct boolReturn : IrNode{
+    boolReturn() {instruction = Instruction::boolReturn;}
 };
