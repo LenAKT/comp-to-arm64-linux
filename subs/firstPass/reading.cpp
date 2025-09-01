@@ -155,7 +155,6 @@ void reading::firstPass(){
                     break;
                 }
                 case Delimiter::BraceClose:{
-                    cout << "inserted function: \"" << nFunction->name << "\"" << endl;
                     scope = nFunction->parentScope;
                     scope->functionMap.emplace(std::make_pair(nFunction->name,std::move(nFunction)));
                     nFunction = nullptr;

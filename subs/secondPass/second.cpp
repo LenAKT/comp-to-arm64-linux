@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <set>
+#include <algorithm>
 
 using namespace std;
 
@@ -88,7 +89,6 @@ void Second::getNodeTree(Variable var,vector<preToken>& buffer, std::string name
         isFound = true;
         cvar = d->second;
     }
-    bool delayedRAssign = false;
     std::shared_ptr<valueNode> node;
     for (int i = 0; i < buffer.size(); i++)
     {
@@ -111,13 +111,14 @@ void Second::getNodeTree(Variable var,vector<preToken>& buffer, std::string name
                     if (token.stringValue == "/"  || token.stringValue == "*" || token.stringValue == "%")
                     {
                         auto opnode = make_shared<operatorNode>();
+                        opnode->name = name;
                         opnode->c = token.stringValue[0];
                         opnode->l = lt->r;
                         lt->r = opnode;
-                        delayedRAssign = true;
                     }
                     else{
                         auto opnode = make_shared<operatorNode>();
+                        opnode->name = name;
                         opnode->c = token.stringValue[0];
                         opnode->l = lt;
                         node = opnode;
@@ -125,11 +126,11 @@ void Second::getNodeTree(Variable var,vector<preToken>& buffer, std::string name
                 }
                 else{
                     auto opnode = make_shared<operatorNode>();
+                    opnode->name = name;
                     opnode->l = node;
                     opnode->c = token.stringValue[0];
                     node = opnode;
                 }
-                
             }
             break;
         }
@@ -161,21 +162,21 @@ void Second::getNodeTree(Variable var,vector<preToken>& buffer, std::string name
                         i++;
                     }                  
                 }
-
                 shared_ptr<functionNode> n = functionHandling(b, it->second, name);
                 if (auto ls = dynamic_pointer_cast<operatorNode>(node))
                 {
-                    ls->r = n;
+                    auto l = rDig(ls);
+                    static_pointer_cast<operatorNode>(l)->r = make_shared<variableNode>(token.stringValue);
                 }
                 else{
                     node = n;
                 }
-                
             }
             else if(dt != scope->variableMap.end()){
                 if (auto ls = dynamic_pointer_cast<operatorNode>(node))
                 {
-                    ls->r = make_shared<variableNode>(token.stringValue);
+                    auto l = rDig(ls);
+                    static_pointer_cast<operatorNode>(l)->r = make_shared<variableNode>(token.stringValue);
                 }
                 else{
                     node = make_shared<variableNode>(token.stringValue);
@@ -187,19 +188,23 @@ void Second::getNodeTree(Variable var,vector<preToken>& buffer, std::string name
         }
     }
     cvar->value = node;
+    if (node && node->type == valueType::Operator)
+    {
+        auto skks = static_pointer_cast<operatorNode>(node);
+        if (skks->foldCheck == false)
+        {
+            cvar->value = startFold(static_pointer_cast<operatorNode>(node), name, 0);   
+        }
+    }
     std::cout << "Declaring: " << name << std::endl;
     shared_ptr<DeclareVar> dVar = make_shared<DeclareVar>();
     dVar->name = name;
     dVar->toDeclare = cvar;
     dVar->value = cvar->value;
     ir.push_back(dVar);
-    if (node && node->type == valueType::Operator)
+    if (cvar->value->type == valueType::Operator)
     {
-        auto skks = static_pointer_cast<operatorNode>(node);
-        if (skks->foldCheck == false)
-        {
-            cvar->value = startFold(static_pointer_cast<operatorNode>(node), name);        
-        }
+        swap(ir[ir.size()-2], ir[ir.size()-1]);
     }
     scope->Cvars.insert(make_pair(name, std::move(cvar)));
     scope->insertioOrder.push_back(name);
@@ -222,17 +227,16 @@ shared_ptr<valueNode> Second::assignValue(shared_ptr<valueNode>& node, valueType
    return node;
 }
 
-shared_ptr<valueNode> Second::startFold(const shared_ptr<operatorNode>& v, std::string pName){
+shared_ptr<valueNode> Second::startFold(const shared_ptr<operatorNode>& v, std::string pName, bool c){
     auto bt = dynamic_pointer_cast<operatorNode>(v->l);
     auto lt = dynamic_pointer_cast<operatorNode>(v->r);
     if(bt)
     {
-        v->l = startFold(static_pointer_cast<operatorNode>(v->l), pName);
+        v->l = startFold(static_pointer_cast<operatorNode>(v->l), "", 1);
     }
     if(lt)
     {
-        v->r = startFold(static_pointer_cast<operatorNode>(v->r), pName);
-       
+        v->r = startFold(static_pointer_cast<operatorNode>(v->r), "", 0);
     }
     if (v->r != nullptr && v->l->type == v->r->type)
     {
@@ -245,13 +249,18 @@ shared_ptr<valueNode> Second::startFold(const shared_ptr<operatorNode>& v, std::
             return stringfolder(v);
         }
     }
-    shared_ptr<ArIr> arIr = make_shared<ArIr>();   
-    arIr->c = v->c;
-    arIr->l = v->l;
-    arIr->r = v->r;
-    arIr->parent = v;
-    arIr->caller = pName;
-    ir.push_back(arIr);
+    if (v->l != nullptr && v->r != nullptr)
+    {
+        shared_ptr<ArIr> arIr = make_shared<ArIr>();   
+        arIr->c = v->c;
+        arIr->parent = v;
+        arIr->l = v->l;
+        arIr->r = v->r;
+        arIr->caller = pName;
+        arIr->isL = c;
+        ir.push_back(arIr);
+    }
+   
     if (auto it = dynamic_pointer_cast<operatorNode>(v))
     {
         it->foldCheck = true;

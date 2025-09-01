@@ -33,7 +33,7 @@ class backEnd
     void movFunc(Mode mode, std::shared_ptr<Cvar> toVar,  std::shared_ptr<Cvar> fromVar);
     int findNextFree(std::vector<bool>* b);
     void Printer(std::shared_ptr<Scope> s);
-    void  ArithmaFunction(std::shared_ptr<ArIr> ir);
+    void  ArithmaFunction(std::shared_ptr<ArIr> ir, bool);
     void runner(std::shared_ptr<IrNode> i);
     void start();
     void clearRegs();

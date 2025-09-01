@@ -142,6 +142,7 @@ struct operatorNode : valueNode
     operatorNode(){type = valueType::Operator;}
     char c;
     bool foldCheck = false;
+    std::string name;
     void print() override {
         if(l) l->print();
         std::cout << c;
@@ -231,6 +232,7 @@ struct ArIr : IrNode{
     std::shared_ptr<valueNode> parent;
     std::shared_ptr<valueNode> l;
     std::shared_ptr<valueNode> r;
+    bool isL;
 };
 
 struct ChangeScp : IrNode{

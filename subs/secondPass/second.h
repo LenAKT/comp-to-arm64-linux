@@ -34,7 +34,7 @@ class Second
 
     std::shared_ptr<valueNode> rDig(std::shared_ptr<operatorNode>& n);
     std::shared_ptr<valueNode> Intfolder(const std::shared_ptr<operatorNode>& node);
-    std::shared_ptr<valueNode> startFold(const std::shared_ptr<operatorNode>& v, std::string );
+    std::shared_ptr<valueNode> startFold(const std::shared_ptr<operatorNode>& v, std::string, bool );
     std::shared_ptr<valueNode> stringfolder(const std::shared_ptr<operatorNode>& node);
 
     void delimiterHandlign(std::vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i);

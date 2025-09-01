@@ -1,15 +1,16 @@
 int q(int c){
-   int b = 2;
-   int a = c + b;
+   int b = 2*3+2*c;
+   int a = c * b;
    return a;
 } 
 
 int g(int w){
-    int a = q(2);
+    int d = 4;
+    int a = q(d);
     return a + w;
 }
 
 int main(){
-    int b = g(3);
+    int b = g(3)*(g4);
     return 0;
 }
