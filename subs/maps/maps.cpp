@@ -90,11 +90,11 @@ const std::unordered_map<char, std::string> arm64Ops = {
     {'=',  "mov"}       // assignment → move value to register
 };
 
-const std::unordered_map<std::string, std::string> arm64BoolOps = {
-    {"<",  "lt"},   // less than
-    {"<=", "le"},   // less than or equal
-    {">",  "gt"},   // greater than
-    {">=", "ge"},   // greater than or equal
-    {"==", "eq"},   // equal
-    {"!=", "ne"}    // not equal
+const std::unordered_map<std::string, std::string> arm64BoolOpsInverted = {
+    {"<",  "ge"},   // inverted: branch if not less than
+    {"<=", "gt"},   // inverted: branch if not less than or equal
+    {">",  "le"},   // inverted: branch if not greater than
+    {">=", "lt"},   // inverted: branch if not greater than or equal
+    {"==", "ne"},   // inverted: branch if not equal
+    {"!=", "eq"}    // inverted: branch if not not equal
 };
