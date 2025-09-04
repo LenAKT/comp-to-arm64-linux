@@ -77,6 +77,8 @@ extern const std::unordered_map<char, std::string> arm64Ops;
 
 extern const std::unordered_map<std::string, std::string> arm64BoolOps;
 
+extern const std::unordered_map<std::string, std::string> arm64BoolOpsInverted;
+
 struct preToken
 {
     std::string stringValue;
@@ -242,7 +244,7 @@ struct ArIr : IrNode{
 };
 
 struct ChangeScp : IrNode{
-    ChangeScp() {instruction = Instruction::ChangeSc; std::cout << "changing scope" << std::endl;}
+    ChangeScp() {instruction = Instruction::ChangeSc;}
     std::shared_ptr<Scope> newScope;
 };
 

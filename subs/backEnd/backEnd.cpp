@@ -52,15 +52,15 @@ void backEnd::Printer(std::shared_ptr<Scope> s){
 }
 
 void backEnd::start(){
-    int d = 0;
-    for (auto i : *Ir)
-    {
-        if (i->instruction == Instruction::DecVar)
-        {
-           d++;
-        }
-        std::cout << toString(i->instruction) << " " << d+9 << std::endl;
-    }
+    // int d = 0;
+    // for (auto i : *Ir)
+    // {
+    //     if (i->instruction == Instruction::DecVar)
+    //     {
+    //        d++;
+    //     }
+    //     std::cout << toString(i->instruction) << " " << d+9 << std::endl;
+    // }
     
     outFile << ".text" << std::endl;
     for(auto i : *Ir){
@@ -365,38 +365,62 @@ void backEnd::clearRegs(Reg* r){
     }
 }
 
+
+//må lagast på nytt når begyn å ta med parantesar funker dårli med blanding av && å ||
 void backEnd::boolFunction(std::shared_ptr<getBool> b){
-    std::cout << "que " << static_cast<int>(b->type) << " " << b->subBools.size() << std::endl;
+   int prevReg = 99;
+   bool containsOr = false;
+   std::cout << "size of bool " << b->subBools.size() << std::endl;
    switch (b->type)
    {
    case BoolEnum::IF:
         for(auto i : b->subBools){
-            if (i.isBool)
-            {
+            // if (i.isBool)
+            // {
+            //     movFunc(Mode::intValue, i.firstArg, nullptr);
+            //     outFile << "cbz w" << i.firstArg->reg << ", skip" << labelCounter << std::endl;
+            //     cReg->regs[i.firstArg->reg] = false;
+            // }
+            if(i.firstArg->reg == 99){
+                i.firstArg->reg = findNextFree(&STMregs);
                 movFunc(Mode::intValue, i.firstArg, nullptr);
-                outFile << "cbz w" << i.firstArg->reg << ", skip" << labelCounter << std::endl;
-                cReg->regs[i.firstArg->reg] = false;
+            }
+            if(i.secondArg->reg == 99){
+                i.secondArg->reg = findNextFree(&STMregs);
+                movFunc(Mode::intValue, i.secondArg, nullptr);
+                }
+            outFile << "cmp w" << i.firstArg->reg << ", w" << i.secondArg->reg << std::endl;
+            if (!i.nextCmpr.stringValue.empty())
+            {
+                if (i.nextCmpr.stringValue == "||")
+                {
+                    auto g = arm64BoolOps.find(i.boolArg.stringValue);
+                    outFile << "b." << g->second << " goto" << labelCounter << std::endl;
+                    containsOr = true;
+                }
+                else if(i.nextCmpr.stringValue == "&&"){
+                    auto g = arm64BoolOpsInverted.find(i.boolArg.stringValue);
+                    outFile << "b." << g->second << " skip" << labelCounter << std::endl;
+                }
             }
             else{
-                if(i.firstArg->reg == 99){
-                    i.firstArg->reg = findNextFree(&STMregs);
-                    movFunc(Mode::intValue, i.firstArg, nullptr);
+                auto g = arm64BoolOpsInverted.find(i.boolArg.stringValue);
+                if (g != arm64BoolOpsInverted.end())
+                {
+                     outFile << "b." << g->second << " skip" << labelCounter << std::endl;
                 }
-                if(i.secondArg->reg == 99){
-                    i.secondArg->reg = findNextFree(&STMregs);
-                    movFunc(Mode::intValue, i.secondArg, nullptr);
-                    }
-                outFile << "cmp w" << i.firstArg->reg << ", w" << i.secondArg->reg << std::endl;
-                auto g = arm64BoolOps.find(i.boolArg.stringValue);
-                outFile << "b." << g->second << " skip" << labelCounter << std::endl;
-                cReg->regs[i.firstArg->reg] = false;
-                cReg->regs[i.secondArg->reg] = false;
+                else{
+                    std::cout << "Big error 124 " << i.boolArg.stringValue << std::endl;
+                }               
             }
+
         }
     break;
-   
    default:
     break;
    }
-    
+   if (containsOr == true)
+   {
+        outFile << "goto" << labelCounter << ":" << std::endl;
+   }    
 }

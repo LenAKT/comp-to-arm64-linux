@@ -453,7 +453,7 @@ void Second::makeBool(std::vector<preToken>& buffer, BoolEnum t){
         else{b.secondArg = c;}
     };
     for (int i = 0; i < buffer.size(); i++)
-    {
+    {   
         auto& token = buffer[i];
         switch (token.cat)
         {

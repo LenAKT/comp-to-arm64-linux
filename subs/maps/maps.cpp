@@ -32,6 +32,8 @@ const std::unordered_map<std::string, TokenCategory> broadTokenMap = {
     {"!=", TokenCategory::OPERATOR},
     {"<", TokenCategory::OPERATOR},
     {">", TokenCategory::OPERATOR},
+    {"|", TokenCategory::OPERATOR},
+    {"&", TokenCategory::OPERATOR},
 
     // Delimiters
     {"(", TokenCategory::DELIMITER},
@@ -97,4 +99,13 @@ const std::unordered_map<std::string, std::string> arm64BoolOpsInverted = {
     {">=", "lt"},   // inverted: branch if not greater than or equal
     {"==", "ne"},   // inverted: branch if not equal
     {"!=", "eq"}    // inverted: branch if not not equal
+}; 
+
+const std::unordered_map<std::string, std::string> arm64BoolOps = {
+    {"<",  "lt"},   // branch if less than
+    {"<=", "le"},   // branch if less than or equal
+    {">",  "gt"},   // branch if greater than
+    {">=", "ge"},   // branch if greater than or equal
+    {"==", "eq"},   // branch if equal
+    {"!=", "ne"}    // branch if not equal
 };

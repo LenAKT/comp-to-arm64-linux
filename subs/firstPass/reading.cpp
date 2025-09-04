@@ -39,9 +39,8 @@ void reading::reader(){
             token.stringValue += '"';
             continue;
         }
-        
         if ((isBreakingChar(mainMemory[i]) && collect == false))
-        {
+        {            
             auto it = broadTokenMap.find(token.stringValue);
             if(it != broadTokenMap.end()){
                 token.cat = it->second;
@@ -77,7 +76,21 @@ void reading::reader(){
             {
                 token.cat = it->second;
                 token.stringValue = d;
-                preTokens.push_back(token);
+                if (token.cat == TokenCategory::OPERATOR && preTokens.back().cat == TokenCategory::OPERATOR)
+                {
+                    auto ls = broadTokenMap.find(preTokens.back().stringValue + token.stringValue);
+                    if (ls != broadTokenMap.end())
+                    {
+                        preTokens.back().stringValue += token.stringValue;
+                        preTokens.back().cat = ls->second;
+                    }
+                    else{
+                        preTokens.push_back(token);
+                    }
+                }
+                else{
+                    preTokens.push_back(token);
+                }
             }
             token.stringValue.clear();
         }
