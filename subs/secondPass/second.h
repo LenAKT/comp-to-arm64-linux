@@ -1,7 +1,10 @@
 #include <iostream>
 #include <vector>
 #include "maps/maps.h"
+#include "backEnd/backEnd.h"
 #include <cstdint>
+
+#pragma once
 
 struct parseLogic
 {
@@ -10,18 +13,21 @@ struct parseLogic
     bool runFunction = false;
     bool setvalue = false;
     bool returningVlaue = false;
+    bool inParams = false;
 };
 
 class Second
 {
     public:
-    Second(std::shared_ptr<Scope>& s,const std::vector<preToken>& v) : outerScope(s), preTokens(v) {scope = outerScope;};
+    Second(std::shared_ptr<Scope>& s,const std::vector<preToken>& v, backEnd& b) : outerScope(s), preTokens(v), backend(b) {scope = outerScope;};
 
     void getNodeTree(Variable var,std::vector<preToken>& buffer, std::string name);
     void secondPass();
 
     template<typename nodeType, typename valueType>
     std::shared_ptr<valueNode> assignValue(std::shared_ptr<valueNode>& node, valueType type);
+
+    backEnd &backend;
 
     std::shared_ptr<Scope> scope;
     std::shared_ptr<Scope> outerScope;
@@ -32,12 +38,17 @@ class Second
     std::vector<std::shared_ptr<IrNode>>* irSender = &ir;
 
     int fBreaker = 0;
+    int pBreaker = 0;
 
     std::shared_ptr<valueNode> rDig(std::shared_ptr<operatorNode>& n);
     std::shared_ptr<valueNode> Intfolder(const std::shared_ptr<operatorNode>& node);
     std::shared_ptr<valueNode> startFold(const std::shared_ptr<operatorNode>& v, std::string, bool );
     std::shared_ptr<valueNode> stringfolder(const std::shared_ptr<operatorNode>& node);
+    void startIR(std::shared_ptr<Scope> s);
+    void boolhandling(std::vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i);
+    void functionDealer(std::vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i);
     void makeBool(std::vector<preToken>& buffer, BoolEnum);
+    std::vector<preToken> paramCollector(std::vector<preToken>& buffer, int *position);
 
     void delimiterHandlign(std::vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i);
     std::shared_ptr<functionNode> functionHandling(std::vector<preToken>& b, std::shared_ptr<NFunction>& n, std::string );

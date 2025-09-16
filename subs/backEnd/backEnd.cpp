@@ -51,7 +51,7 @@ void backEnd::Printer(std::shared_ptr<Scope> s){
 
 }
 
-void backEnd::start(){
+void backEnd::start(std::vector<std::shared_ptr<IrNode>>* Ir){
     // int d = 0;
     // for (auto i : *Ir)
     // {
@@ -61,9 +61,9 @@ void backEnd::start(){
     //     }
     //     std::cout << toString(i->instruction) << " " << d+9 << std::endl;
     // }
-    
-    outFile << ".text" << std::endl;
-    for(auto i : *Ir){
+    gIr = Ir;
+    int numberCounter;
+    for(auto& i : *Ir){
         switch (i->instruction)
         {
         case Instruction::DecFunc:
@@ -71,19 +71,28 @@ void backEnd::start(){
             break;
         case Instruction::DecVar:{
                 auto d = std::static_pointer_cast<DeclareVar>(i);
-                makeVar(d->toDeclare, d->value, d->name);
+                if (d->toDeclare->seen > 0 || d->name == "return")
+                {
+                     makeVar(d->toDeclare, d->value, d->name);
+                }
             break;}
         case Instruction::RetValue:
-                // forceTakeR(0);
                 moveToReg(scope->Cvars["return"], 0);
                 outFile << "ret" << std::endl;
+                clearRegs(&FuRegs);
+                clearRegs(&STMregs);
             break;
         case Instruction::ChangeSc:
                 scope = std::static_pointer_cast<ChangeScp>(i)->newScope;
             break;
-        case Instruction::Arithma:
-                ArithmaFunction(std::static_pointer_cast<ArIr>(i), std::static_pointer_cast<ArIr>(i)->isL);
-            break;
+        case Instruction::Arithma:{
+                auto d = std::static_pointer_cast<ArIr>(i);
+                // if (scope->Cvars[std::static_pointer_cast<operatorNode>(d->parent)->name]->seen > 0)
+                // {
+                    std::cout << "something: " << std::static_pointer_cast<operatorNode>(d->parent)->name << std::endl;
+                    ArithmaFunction(std::static_pointer_cast<ArIr>(i), std::static_pointer_cast<ArIr>(i)->isL);
+                // }
+            break;}
         case Instruction::getFuncVal:{
                 int adr = findNextFree(cReg);
                runner(i, adr);
@@ -95,9 +104,17 @@ void backEnd::start(){
         case Instruction::boolReturn:
             outFile << "skip" << labelCounter <<":" << std::endl;
             labelCounter++;
+        case Instruction::DestoyFunc:
+            // scope->functionMap[std::static_pointer_cast<destroyFunc>(i)->name].reset();
         default:
             break;
         }
+        for( auto d : clean){
+            std::cout << "something important: " << d->seen << std::endl;
+        }
+        cleanUp(numberCounter);
+        clean.clear();
+        numberCounter++;
     }
 }
 
@@ -132,22 +149,25 @@ void backEnd::moveToReg(std::shared_ptr<Cvar> var, int reg){
 
 void backEnd::makeVar(std::shared_ptr<Cvar> var, std::shared_ptr<valueNode> node, std::string name){
     var->value = node;
-    if (var->reg == 99)
+    if (var->reg < 0)
     {
         var->reg = findNextFree(cReg);
     }
     switch (var->value->type)
     {
     case valueType::Intager:
-        movFunc(Mode::intValue, var, nullptr);
+        movFunc(Mode::intValue, var, 0);
     break;
     case valueType::Varible:
-        movFunc(Mode::varValue, var, scope->Cvars[std::static_pointer_cast<variableNode>(var->value)->name]);
+        movFunc(Mode::varValue, var, scope->Cvars[std::static_pointer_cast<variableNode>(var->value)->name]->reg);
     break;
     case valueType::Operator:
         break;
     case valueType::Func:
-
+        if (var->reg != *std::static_pointer_cast<functionNode>(var->value)->reg)
+        {
+            movFunc(Mode::varValue, var, *std::static_pointer_cast<functionNode>(var->value)->reg);
+        }
         break;
     default:
         break;
@@ -183,13 +203,15 @@ void backEnd::makeFunction(std::string name){
 int backEnd::findNextFree(Reg* r){
    for (int i = r->start; i < r->end; i++)
    {
+        std::cout << i << " " << r->regs[i] << std::endl;
         if (r->regs[i] == false)
         {
             r->regs[i] = true;
             return i;
         }
    }
-   return 99;
+   spillNR++;
+   return -spillNR;
 }
 
 void backEnd::forceTakeR(int a){
@@ -207,7 +229,7 @@ void backEnd::forceTakeR(int a){
     }
 }
 
-void backEnd::movFunc(Mode mode, std::shared_ptr<Cvar> toVar,  std::shared_ptr<Cvar> fromVar){
+void backEnd::movFunc(Mode mode, std::shared_ptr<Cvar> toVar,  int fromVar){
     outFile << "mov " << (toVar->is4byte ? "w" : "x") << toVar->reg << ", ";
     switch (mode)
     {
@@ -215,12 +237,12 @@ void backEnd::movFunc(Mode mode, std::shared_ptr<Cvar> toVar,  std::shared_ptr<C
             outFile << "#" << std::static_pointer_cast<intNode>(toVar->value)->value << std::endl;
         break;
     case Mode::varValue:
-            if (fromVar->reg == 99)
+            if (fromVar < 0)
             {
                 std::cout << "order erro" << std::endl;
             }
             else{
-                outFile << (toVar->is4byte ? "w" : "x") << fromVar->reg << std::endl;
+                outFile << (toVar->is4byte ? "w" : "x") << fromVar << std::endl;
             }
         break;
     default:
@@ -238,11 +260,13 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
         std::shared_ptr<regOnlyNode> re = std::make_shared<regOnlyNode>();
         delteRegs.insert(toReg);
         re->reg = toReg;
-        for (int i = 0; i < Ir->size(); i++)
+        for (int i = 0; i < gIr->size(); i++)
         {
-            if ((*Ir)[i]->instruction == Instruction::Arithma && (*Ir)[i] != ir)
+            if ((*gIr)[i]->instruction == Instruction::Arithma && 
+                (std::static_pointer_cast<ArIr>((*gIr)[i])->l == ir->parent || 
+                std::static_pointer_cast<ArIr>((*gIr)[i])->r == ir->parent))
             {
-                auto s = std::static_pointer_cast<ArIr>((*Ir)[i]);
+                auto s = std::static_pointer_cast<ArIr>((*gIr)[i]);
                 if(isL){s->l = re;}
                 else{s->r = re;}
                 break;
@@ -259,19 +283,18 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
     int* trueVal = nullptr;
     int* trueValR = nullptr;
     int i = 0;
-
     auto check = [&](auto node) -> bool{
         if (node->type == valueType::Varible)
         {
-            auto s = scope->Cvars[std::static_pointer_cast<variableNode>(node)->name];
-            if(type == s->var.type)
+            auto s = scope->Cvars.find(std::static_pointer_cast<variableNode>(node)->name);
+            if(s != scope->Cvars.end() && type == s->second->var.type)
             {
-                *currentReg = s->reg;
+                *currentReg = s->second->reg;
                 i++;
                 return true;
             }
             else{
-                std::cout << "Arithmatic error 1" << std::endl;
+                std::cout << "Arithmatic error 1 " << std::endl;
                 exit(1);
                 return false;
             }
@@ -281,6 +304,7 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
             if(type == scope->functionMap[s->name]->returnType)
             {
                 *currentReg = *s->reg;
+                i++;
                 delteRegs.insert(*s->reg);
                 return true;
             }
@@ -297,7 +321,8 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
                     std::shared_ptr<Cvar> c = std::make_shared<Cvar>();
                     c->value = node;
                     c->reg = findNextFree(cReg);
-                    movFunc(Mode::intValue, c, nullptr);
+                    c->seen = 1;
+                    movFunc(Mode::intValue, c, 0);
                     *currentReg = c->reg;
                     delteRegs.insert(c->reg);
                 }
@@ -316,6 +341,7 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
         }
         else if(node->type == valueType::regValue){
             *currentReg = std::static_pointer_cast<regOnlyNode>(node)->reg;   
+            i++;
             return true;  
         }
         return false;
@@ -349,9 +375,10 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
         }
     }
     auto d = [&](int reg){
-        if (delteRegs.erase(reg))
+        if (delteRegs.erase(reg) && reg > 0)
         {
-            cReg->regs.at(reg-cReg->start) = false;
+            std::cout << "Delteing regs: " << reg << "at " << reg-cReg->start << std::endl;
+            cReg->regs[reg] = false;
         }
     };
     d(leftReg);
@@ -368,26 +395,24 @@ void backEnd::clearRegs(Reg* r){
 
 //må lagast på nytt når begyn å ta med parantesar funker dårli med blanding av && å ||
 void backEnd::boolFunction(std::shared_ptr<getBool> b){
-   int prevReg = 99;
+   int prevReg = -1;
    bool containsOr = false;
    std::cout << "size of bool " << b->subBools.size() << std::endl;
    switch (b->type)
    {
    case BoolEnum::IF:
         for(auto i : b->subBools){
-            // if (i.isBool)
-            // {
-            //     movFunc(Mode::intValue, i.firstArg, nullptr);
-            //     outFile << "cbz w" << i.firstArg->reg << ", skip" << labelCounter << std::endl;
-            //     cReg->regs[i.firstArg->reg] = false;
-            // }
-            if(i.firstArg->reg == 99){
+            if(i.firstArg != nullptr){cleanPush(i.firstArg);}
+            else {std::cout << "massive error" << std::endl;}
+            if(i.secondArg != nullptr){cleanPush(i.secondArg);}
+            else {std::cout << "massive error 2" << std::endl;}
+            if(i.firstArg->reg < 0){
                 i.firstArg->reg = findNextFree(&STMregs);
-                movFunc(Mode::intValue, i.firstArg, nullptr);
+                movFunc(Mode::intValue, i.firstArg, 0);
             }
-            if(i.secondArg->reg == 99){
+            if(i.secondArg->reg < 0){
                 i.secondArg->reg = findNextFree(&STMregs);
-                movFunc(Mode::intValue, i.secondArg, nullptr);
+                movFunc(Mode::intValue, i.secondArg, 0);
                 }
             outFile << "cmp w" << i.firstArg->reg << ", w" << i.secondArg->reg << std::endl;
             if (!i.nextCmpr.stringValue.empty())
@@ -422,5 +447,15 @@ void backEnd::boolFunction(std::shared_ptr<getBool> b){
    if (containsOr == true)
    {
         outFile << "goto" << labelCounter << ":" << std::endl;
-   }    
+   }
+}
+
+void backEnd::cleanUp(int i){
+    for(auto& p : clean){
+        p->lastSeen = i;
+        if (p->seen == 0)
+        {
+            cReg->regs[p->reg] = false;
+        }
+    }
 }

@@ -11,10 +11,11 @@ int main(int argc, char const *argv[])
     read.setMemory("Manifesto.txt");
     read.reader();
     read.firstPass();
-    Second second(read.scope, read.preTokens);
+
+    backEnd b(read.scope);
+
+    Second second(read.scope, read.preTokens, b);
     second.secondPass();
-    backEnd b(second.outerScope, second.irSender);
-    // b.Printer(second.outerScope);
-    b.start();
+
     return 0;
 }

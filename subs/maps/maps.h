@@ -93,10 +93,12 @@ struct Variable
 
 
 struct Cvar{
+    ~Cvar() {}
     std::shared_ptr<valueNode> value;
     Variable var;
-    uintptr_t adress;
-    int reg = 99;
+    int lastSeen;
+    int seen = 0;
+    int reg = -1;
     bool is4byte = true;
 };
 
@@ -113,7 +115,6 @@ enum class valueType{
 struct NFunction{
     Prefix prefix;
     VarType returnType;
-    std::shared_ptr<Scope> parentScope;
     std::shared_ptr<Scope> scope;
     std::vector<preToken> fContainer;
     std::string name;
@@ -127,6 +128,8 @@ struct Scope{
     std::vector<std::string> insertioOrder;
     std::unordered_map<std::string, std::shared_ptr<Cvar>> Cvars;
     std::shared_ptr<Scope> parentS;
+
+    int emptyCounter;
 };
 
 struct valueNode
@@ -138,6 +141,7 @@ struct valueNode
 
 struct regOnlyNode : valueNode{
     regOnlyNode(){type = valueType::regValue;}
+    int* pReg;
     int reg;
 };
 
@@ -200,6 +204,7 @@ enum class Instruction{
     getFuncVal,
     getBool,
     boolReturn,
+    DestoyFunc
 };
 
 struct IrNode{
@@ -272,4 +277,9 @@ struct getBool : IrNode{
 
 struct boolReturn : IrNode{
     boolReturn() {instruction = Instruction::boolReturn;}
+};
+
+struct destroyFunc : IrNode{
+     destroyFunc() {instruction = Instruction::DestoyFunc;}
+     std::string name; 
 };

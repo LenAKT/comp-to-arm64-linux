@@ -1,13 +1,22 @@
-int h(int x){
-    int b = 2;
-    int c = 3;
-    if(b == x || c == x){
-        b = 5;
-    }
-    return b;
+int f(int c){
+    return 2*c;
 }
 
-int main(){
-    int a = h(5);
-    return a;
+int main() {
+   int a = f(2);
+   int b = 2;
+   int c = b;
+   int z = 5;
+   if(a == 4){
+        b = 3;
+   }
+   int d = c;
+   a = z + b;
+   int z = 10;
+   int p = c + a;
+   int r = c+c;  
+   p = p + a;
+   int pp = 2;
+   int cc = 4;
+   return a+z+p+r+p+z+a+c+pp+cc;
 }

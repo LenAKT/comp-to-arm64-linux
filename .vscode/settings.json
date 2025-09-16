@@ -74,6 +74,11 @@
         "queue": "cpp",
         "span": "cpp",
         "stack": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "__memory": "cpp",
+        "chrono": "cpp",
+        "filesystem": "cpp",
+        "charconv": "cpp",
+        "format": "cpp"
     }
 }

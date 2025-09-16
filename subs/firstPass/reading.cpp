@@ -125,8 +125,8 @@ void reading::firstPass(){
                         }
                         inParams = true; 
                         nFunction = std::make_shared<NFunction>();
-                        nFunction->parentScope = scope;
                         nFunction->scope = make_shared<Scope>();
+                        nFunction->scope->parentS = scope;
                         nFunction->scope->functionMap = scope->functionMap;
                         functionAssigning(nFunction, buffer);
                         buffer.clear();
@@ -136,14 +136,23 @@ void reading::firstPass(){
                 case Delimiter::ParenthesisClose:{
                     if (inParams == true)
                     {
+                        order.clear();
                         if (buffer.size() > 0)
                         {
+                            for(int i = 0; i < buffer.size(); i++){
+                                if (buffer[i].stringValue == ",")
+                                {
+                                    std::vector<preToken> b2;
+                                    b2.insert(b2.begin(), buffer.begin(), buffer.begin()+i+1);
+                                    b2[i].stringValue = ";";
+                                    variableAssigning(nFunction->paramMap, scope->functionMap, b2);
+                                }
+                            }
                             preToken pToken;
                             pToken.stringValue = ";";
                             pToken.cat = TokenCategory::DELIMITER;
                             buffer.push_back(pToken);
                         }
-                        order.clear();
                         variableAssigning(nFunction->paramMap, scope->functionMap, buffer);
                         nFunction->scope->variableMap = nFunction->paramMap;
                         nFunction->scope->functionMap.clear();
@@ -180,7 +189,7 @@ void reading::firstPass(){
                     semiCount--;
                     if (semiCount == 0)
                     {
-                        scope = nFunction->parentScope;
+                        scope = nFunction->scope->parentS;
                         scope->functionMap.emplace(std::make_pair(nFunction->name,std::move(nFunction)));
                         nFunction = nullptr;
                         inFunction = false;
@@ -188,12 +197,13 @@ void reading::firstPass(){
                     break;
                 }
                 default:
+                    buffer.push_back(preTokens[i]);
                     break;
+                }
             }
-        }
-        else{
-            cout << "error1";
-        }
+            else{
+                cout << "error1";
+            }
             
         }
         else{
