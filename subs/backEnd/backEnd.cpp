@@ -73,10 +73,11 @@ void backEnd::start(std::vector<std::shared_ptr<IrNode>>* Ir){
                 auto d = std::static_pointer_cast<DeclareVar>(i);
                 if (d->toDeclare->seen > 0 || d->name == "return")
                 {
-                     makeVar(d->toDeclare, d->value, d->name);
+                    makeVar(d->toDeclare, d->value, d->name);
                 }
             break;}
         case Instruction::RetValue:
+                cReg->regs[scope->Cvars["return"]->reg] = false;
                 moveToReg(scope->Cvars["return"], 0);
                 outFile << "ret" << std::endl;
                 clearRegs(&FuRegs);
@@ -89,7 +90,6 @@ void backEnd::start(std::vector<std::shared_ptr<IrNode>>* Ir){
                 auto d = std::static_pointer_cast<ArIr>(i);
                 // if (scope->Cvars[std::static_pointer_cast<operatorNode>(d->parent)->name]->seen > 0)
                 // {
-                    std::cout << "something: " << std::static_pointer_cast<operatorNode>(d->parent)->name << std::endl;
                     ArithmaFunction(std::static_pointer_cast<ArIr>(i), std::static_pointer_cast<ArIr>(i)->isL);
                 // }
             break;}
@@ -109,8 +109,8 @@ void backEnd::start(std::vector<std::shared_ptr<IrNode>>* Ir){
         default:
             break;
         }
-        for( auto d : clean){
-            std::cout << "something important: " << d->seen << std::endl;
+        for(auto d : clean){
+            // std::cout << d->reg << " something important: " << d->seen << std::endl;
         }
         cleanUp(numberCounter);
         clean.clear();
@@ -122,7 +122,7 @@ void backEnd::runner(std::shared_ptr<IrNode> i, int newAdr){
     auto s = std::static_pointer_cast<getFuncVal>(i);
     for (int i = 0; i < s->params.size(); i++)
     {
-        if(FuRegs.regs[i] == true){forceTakeR(i);}
+        forceTakeR(i);
         switch (s->params[i].cat)
         {
         case TokenCategory::NUMBER:
@@ -130,6 +130,7 @@ void backEnd::runner(std::shared_ptr<IrNode> i, int newAdr){
             break;
         case TokenCategory::VARIABLE:
             outFile << "mov x" << i << ", x" << scope->Cvars[s->params[i].stringValue]->reg << std::endl;
+            cleanPush(scope->Cvars[s->params[i].stringValue]);
             break;
         default:
             break;
@@ -140,7 +141,6 @@ void backEnd::runner(std::shared_ptr<IrNode> i, int newAdr){
     clearRegs(&STMregs);
     outFile << "mov x" << newAdr << ", x0" << std::endl;
     scope->Cvars[s->callerName]->reg = newAdr;
-    FuRegs.regs[0] = false;
 }
 
 void backEnd::moveToReg(std::shared_ptr<Cvar> var, int reg){
@@ -160,6 +160,7 @@ void backEnd::makeVar(std::shared_ptr<Cvar> var, std::shared_ptr<valueNode> node
     break;
     case valueType::Varible:
         movFunc(Mode::varValue, var, scope->Cvars[std::static_pointer_cast<variableNode>(var->value)->name]->reg);
+        cleanPush(scope->Cvars[std::static_pointer_cast<variableNode>(var->value)->name]);
     break;
     case valueType::Operator:
         break;
@@ -203,7 +204,6 @@ void backEnd::makeFunction(std::string name){
 int backEnd::findNextFree(Reg* r){
    for (int i = r->start; i < r->end; i++)
    {
-        std::cout << i << " " << r->regs[i] << std::endl;
         if (r->regs[i] == false)
         {
             r->regs[i] = true;
@@ -227,6 +227,7 @@ void backEnd::forceTakeR(int a){
         FuRegs.regs[a] = false;
         outFile << "mov x" << m << ", x" << a << std::endl;
     }
+    FuRegs.regs[a] = false;
 }
 
 void backEnd::movFunc(Mode mode, std::shared_ptr<Cvar> toVar,  int fromVar){
@@ -237,13 +238,7 @@ void backEnd::movFunc(Mode mode, std::shared_ptr<Cvar> toVar,  int fromVar){
             outFile << "#" << std::static_pointer_cast<intNode>(toVar->value)->value << std::endl;
         break;
     case Mode::varValue:
-            if (fromVar < 0)
-            {
-                std::cout << "order erro" << std::endl;
-            }
-            else{
-                outFile << (toVar->is4byte ? "w" : "x") << fromVar << std::endl;
-            }
+            outFile << (toVar->is4byte ? "w" : "x") << fromVar << std::endl;
         break;
     default:
         break;
@@ -377,7 +372,6 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
     auto d = [&](int reg){
         if (delteRegs.erase(reg) && reg > 0)
         {
-            std::cout << "Delteing regs: " << reg << "at " << reg-cReg->start << std::endl;
             cReg->regs[reg] = false;
         }
     };
@@ -386,7 +380,7 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
 }
 
 void backEnd::clearRegs(Reg* r){
-    for (int i = 0; i < r->end-r->start; i++)
+    for (int i = r->start; i < r->end; i++)
     {
         r->regs[i] = false;
     }
@@ -397,7 +391,7 @@ void backEnd::clearRegs(Reg* r){
 void backEnd::boolFunction(std::shared_ptr<getBool> b){
    int prevReg = -1;
    bool containsOr = false;
-   std::cout << "size of bool " << b->subBools.size() << std::endl;
+   std::vector<int> delte;
    switch (b->type)
    {
    case BoolEnum::IF:
@@ -408,10 +402,12 @@ void backEnd::boolFunction(std::shared_ptr<getBool> b){
             else {std::cout << "massive error 2" << std::endl;}
             if(i.firstArg->reg < 0){
                 i.firstArg->reg = findNextFree(&STMregs);
+                delte.push_back(i.firstArg->reg);
                 movFunc(Mode::intValue, i.firstArg, 0);
             }
             if(i.secondArg->reg < 0){
                 i.secondArg->reg = findNextFree(&STMregs);
+                delte.push_back(i.secondArg->reg);
                 movFunc(Mode::intValue, i.secondArg, 0);
                 }
             outFile << "cmp w" << i.firstArg->reg << ", w" << i.secondArg->reg << std::endl;
@@ -435,7 +431,7 @@ void backEnd::boolFunction(std::shared_ptr<getBool> b){
                      outFile << "b." << g->second << " skip" << labelCounter << std::endl;
                 }
                 else{
-                    std::cout << "Big error 124 " << i.boolArg.stringValue << std::endl;
+                    std::cout << "Big error 124 " << i.boolArg.stringValue << " " << i.reg << std::endl;
                 }               
             }
 
@@ -448,12 +444,15 @@ void backEnd::boolFunction(std::shared_ptr<getBool> b){
    {
         outFile << "goto" << labelCounter << ":" << std::endl;
    }
+    for(int d : delte){
+        cReg->regs[d] = false;
+    }
 }
 
 void backEnd::cleanUp(int i){
     for(auto& p : clean){
         p->lastSeen = i;
-        if (p->seen == 0)
+        if (p->seen <= 0)
         {
             cReg->regs[p->reg] = false;
         }

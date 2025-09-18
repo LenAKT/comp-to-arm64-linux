@@ -53,6 +53,7 @@ class Second
     void delimiterHandlign(std::vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i);
     std::shared_ptr<functionNode> functionHandling(std::vector<preToken>& b, std::shared_ptr<NFunction>& n, std::string );
     parseLogic logic;
+    int fakeNum = 0;
 };
 
 

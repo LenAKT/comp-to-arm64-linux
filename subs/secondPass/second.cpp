@@ -60,7 +60,6 @@ void Second::secondPass(){
         case TokenCategory::KEYWORD:
             if (token.stringValue == "if" || token.stringValue == "while" || token.stringValue == "else")
             {
-                std::cout << "Set bool true" << std::endl;
                 name = token.stringValue;
                 logic.setBool = true;
                 logic.inParams = true;
@@ -178,6 +177,7 @@ void Second::getNodeTree(Variable var,vector<preToken>& buffer, std::string name
                 if (dt->second->value->type != valueType::Intager)
                 {
                     dt->second->seen++;
+                    std::cout << "Increased value of: " << dt->first << " To: " << dt->second->seen << " parent: " << name << std::endl;
                 }
                 if (auto ls = dynamic_pointer_cast<operatorNode>(node))
                 {
@@ -235,7 +235,7 @@ void Second::getNodeTree(Variable var,vector<preToken>& buffer, std::string name
         swap(ir[ir.size()-2], ir[ir.size()-1]);
         cvar->value = std::make_shared<variableNode>(name);
     }
-    if (logic.setBool)
+    if (logic.setBool && isFound == true)
     {
         cvar->value = make_shared<variableNode>(name);
     }
@@ -292,7 +292,6 @@ shared_ptr<valueNode> Second::startFold(const shared_ptr<operatorNode>& v, std::
         arIr->caller = pName;
         arIr->isL = c;
         ir.push_back(arIr);
-        std::cout << "xxd: " << pName << std::endl;
     }
    
     if (auto it = dynamic_pointer_cast<operatorNode>(v))
@@ -357,10 +356,17 @@ std::shared_ptr<functionNode>  Second::functionHandling(vector<preToken>& buffer
         if (i.cat == TokenCategory::NUMBER || i.cat == TokenCategory::VARIABLE)
         {
            f->paramVars.push_back(i);
+           if (i.cat == TokenCategory::VARIABLE)
+           {
+              auto it = scope->Cvars.find(i.stringValue);
+              if (it != scope->Cvars.end())
+              {
+                it->second->seen++;
+              }
+           }
         }
     }
     f->name = n->name;
-
     std::shared_ptr<getFuncVal> a = make_shared<getFuncVal>();
     a->name = f->name;
     a->params = f->paramVars;
@@ -416,6 +422,7 @@ void Second::delimiterHandlign(vector<preToken>& buffer, std::string& name, Vari
         getNodeTree(p ,buffer, "return");
         std::shared_ptr<ReturnValue> r = make_shared<ReturnValue>();
         ir.push_back(r);
+        buffer.clear();
         logic.collecting = false;
         logic.returningVlaue = false;
     }
@@ -501,6 +508,7 @@ void Second::functionDealer(vector<preToken>& buffer, std::string& name, Variabl
         for(auto k : activeFunction->paramMap){
             shared_ptr<Cvar> c = make_shared<Cvar>();
             c->var = k.second;
+            c->seen = 0;
             c->value = make_shared<variableNode>(k.first);
             activeFunction->scope->Cvars.insert(make_pair(k.first, c));
             activeFunction->scope->insertioOrder.push_back(k.first);
@@ -516,7 +524,6 @@ void Second::boolhandling(vector<preToken>& buffer, std::string& name, Variable&
         logic.collecting = false;
         if (name == "if")
         {
-            std::cout << "Making bool " << std::endl;
            makeBool(buffer, BoolEnum::IF);
         }
         else if(name == "while"){
@@ -567,19 +574,44 @@ std::vector<preToken> Second::paramCollector(std::vector<preToken>& buffer, int 
         if (buffer[*position].stringValue == "(")
         {
             pCount++;
+            ret.push_back(buffer[*position]);    
+            (*position)++;
         }
         else if (buffer[*position].stringValue == ")")
         {
             pCount--;
             if (pCount != 0)
             {
+                ret.push_back(buffer[*position]);    
                 (*position)++;
             }                        
         }
         else{
-            ret.push_back(buffer[*position]);
+            ret.push_back(buffer[*position]);    
             (*position)++;
-        }                  
+        }    
+    }
+    for(int i = 0; i < ret.size(); i++){
+        auto token = ret[i];
+        if (token.cat == TokenCategory::VARIABLE)
+        {
+            auto f = outerScope->functionMap.find(token.stringValue);
+            if (f != outerScope->functionMap.end())
+            {
+                int si = i;
+                std::vector<preToken> b = paramCollector(ret, &i);
+                std::shared_ptr<functionNode> ff = functionHandling(b, f->second, "fake"+to_string(fakeNum));
+                std::shared_ptr<Cvar> c = make_shared<Cvar>();
+                c->value = ff;
+                c->var.type = f->second->returnType;
+                ret.erase(ret.begin()+si, ret.begin()+i);
+                i = si;
+                ret[i].cat = TokenCategory::VARIABLE;
+                ret[i].stringValue = "fake"+to_string(fakeNum);
+                fakeNum++;
+                scope->Cvars.insert(make_pair(ret[i].stringValue, c));
+            }
+        }
     }
     return ret;
 }
