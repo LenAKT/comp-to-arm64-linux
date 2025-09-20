@@ -90,7 +90,7 @@ void backEnd::start(std::vector<std::shared_ptr<IrNode>>* Ir){
                 auto d = std::static_pointer_cast<ArIr>(i);
                 // if (scope->Cvars[std::static_pointer_cast<operatorNode>(d->parent)->name]->seen > 0)
                 // {
-                    ArithmaFunction(std::static_pointer_cast<ArIr>(i), std::static_pointer_cast<ArIr>(i)->isL);
+                ArithmaFunction(std::static_pointer_cast<ArIr>(i), std::static_pointer_cast<ArIr>(i)->isL);
                 // }
             break;}
         case Instruction::getFuncVal:{
@@ -102,7 +102,8 @@ void backEnd::start(std::vector<std::shared_ptr<IrNode>>* Ir){
                 boolFunction(std::static_pointer_cast<getBool>(i));
               break;
         case Instruction::boolReturn:
-            outFile << "skip" << labelCounter <<":" << std::endl;
+            outFile << "skip" << (uSkip > 0 ? uSkip : labelCounter) <<":" << std::endl;
+            uSkip = -1;
             labelCounter++;
         case Instruction::DestoyFunc:
             // scope->functionMap[std::static_pointer_cast<destroyFunc>(i)->name].reset();
@@ -125,9 +126,14 @@ void backEnd::runner(std::shared_ptr<IrNode> i, int newAdr){
         forceTakeR(i);
         switch (s->params[i].cat)
         {
-        case TokenCategory::NUMBER:
-            outFile << "mov x" << i << ", #" << s->params[i].stringValue << std::endl;
-            break;
+        case TokenCategory::NUMBER:{
+            std::shared_ptr<Cvar> c = std::make_shared<Cvar>();
+            c->reg = i;
+            auto d =  std::make_shared<intNode>();
+            d->value = std::stoi(s->params[i].stringValue);
+            c->value = d;
+            movFunc(Mode::intValue, c, 0);
+            break;}
         case TokenCategory::VARIABLE:
             outFile << "mov x" << i << ", x" << scope->Cvars[s->params[i].stringValue]->reg << std::endl;
             cleanPush(scope->Cvars[s->params[i].stringValue]);
@@ -231,13 +237,20 @@ void backEnd::forceTakeR(int a){
 }
 
 void backEnd::movFunc(Mode mode, std::shared_ptr<Cvar> toVar,  int fromVar){
-    outFile << "mov " << (toVar->is4byte ? "w" : "x") << toVar->reg << ", ";
     switch (mode)
     {
     case Mode::intValue:
-            outFile << "#" << std::static_pointer_cast<intNode>(toVar->value)->value << std::endl;
+            if(std::static_pointer_cast<intNode>(toVar->value)->value <= 65535){
+                outFile << "mov " << (toVar->is4byte ? "w" : "x") << toVar->reg << ", ";
+                outFile << "#" << std::static_pointer_cast<intNode>(toVar->value)->value << std::endl;
+            }
+            else{
+                outFile << "ldr " << (toVar->is4byte ? "w" : "x") << toVar->reg << ", ";
+                outFile << "=" << std::static_pointer_cast<intNode>(toVar->value)->value << std::endl;
+            }            
         break;
     case Mode::varValue:
+            outFile << "mov " << (toVar->is4byte ? "w" : "x") << toVar->reg << ", ";
             outFile << (toVar->is4byte ? "w" : "x") << fromVar << std::endl;
         break;
     default:
@@ -390,7 +403,11 @@ void backEnd::clearRegs(Reg* r){
 //må lagast på nytt når begyn å ta med parantesar funker dårli med blanding av && å ||
 void backEnd::boolFunction(std::shared_ptr<getBool> b){
    int prevReg = -1;
-   bool containsOr = false;
+   bool inverted = true;
+   bool useTrueValF = false;
+    bool useTrueValS = false;
+    int Fvalue;
+    int Svalue;
    std::vector<int> delte;
    switch (b->type)
    {
@@ -401,48 +418,72 @@ void backEnd::boolFunction(std::shared_ptr<getBool> b){
             if(i.secondArg != nullptr){cleanPush(i.secondArg);}
             else {std::cout << "massive error 2" << std::endl;}
             if(i.firstArg->reg < 0){
-                i.firstArg->reg = findNextFree(&STMregs);
-                delte.push_back(i.firstArg->reg);
-                movFunc(Mode::intValue, i.firstArg, 0);
+                if (i.firstArg->value->type == valueType::Intager && std::static_pointer_cast<intNode>(i.firstArg->value)->value < 4096)
+                {
+                    useTrueValF = true;
+                    Fvalue = std::static_pointer_cast<intNode>(i.firstArg->value)->value;
+                }
+                else{
+                    i.firstArg->reg = findNextFree(&STMregs);
+                    delte.push_back(i.firstArg->reg);
+                    movFunc(Mode::intValue, i.firstArg, 0);
+                }
             }
             if(i.secondArg->reg < 0){
-                i.secondArg->reg = findNextFree(&STMregs);
-                delte.push_back(i.secondArg->reg);
-                movFunc(Mode::intValue, i.secondArg, 0);
+                if (i.secondArg->value->type == valueType::Intager && std::static_pointer_cast<intNode>(i.secondArg->value)->value < 4096)
+                {
+                    useTrueValS = true;
+                    Svalue = std::static_pointer_cast<intNode>(i.secondArg->value)->value;
                 }
-            outFile << "cmp w" << i.firstArg->reg << ", w" << i.secondArg->reg << std::endl;
+                else{
+                    i.secondArg->reg = findNextFree(&STMregs);
+                    delte.push_back(i.secondArg->reg);
+                    movFunc(Mode::intValue, i.secondArg, 0);
+                }
+            }
+            outFile << "cmp " << (useTrueValF ? "#" : "w") << (useTrueValF ? Fvalue : i.firstArg->reg) 
+                    << ", " << (useTrueValS ? "#" : "w") << (useTrueValS ? Svalue : i.secondArg->reg) << std::endl;
             if (!i.nextCmpr.stringValue.empty())
             {
                 if (i.nextCmpr.stringValue == "||")
                 {
-                    auto g = arm64BoolOps.find(i.boolArg.stringValue);
-                    outFile << "b." << g->second << " goto" << labelCounter << std::endl;
-                    containsOr = true;
+                    inverted = false;
                 }
-                else if(i.nextCmpr.stringValue == "&&"){
-                    auto g = arm64BoolOpsInverted.find(i.boolArg.stringValue);
-                    outFile << "b." << g->second << " skip" << labelCounter << std::endl;
-                }
+                auto g = arm64BoolOps.find(i.boolArg.stringValue);
+                outFile << "b." << g->second <<  (inverted ? " skip" : " goto") << labelCounter << std::endl;
             }
             else{
                 auto g = arm64BoolOpsInverted.find(i.boolArg.stringValue);
                 if (g != arm64BoolOpsInverted.end())
                 {
-                     outFile << "b." << g->second << " skip" << labelCounter << std::endl;
+                    outFile << "b." << g->second << " skip" << labelCounter << std::endl;
                 }
                 else{
                     std::cout << "Big error 124 " << i.boolArg.stringValue << " " << i.reg << std::endl;
                 }               
             }
-
+        }
+        if (!inverted)
+        {
+                outFile << "goto" << labelCounter << ":" << std::endl;
+        }
+    break;
+    case BoolEnum::ELSE: 
+        if (uSkip < 0)
+        {
+            uSkip = labelCounter + 1;
+            outFile << "b skip" << uSkip << std::endl;
+            outFile << "skip" << labelCounter << ":" << std::endl;
+            labelCounter += 2;
+        }
+        else{
+            outFile << "b skip" << uSkip << std::endl;
+            outFile << "skip" << labelCounter << ":" << std::endl;
+            labelCounter++;
         }
     break;
    default:
     break;
-   }
-   if (containsOr == true)
-   {
-        outFile << "goto" << labelCounter << ":" << std::endl;
    }
     for(int d : delte){
         cReg->regs[d] = false;

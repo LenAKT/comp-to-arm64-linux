@@ -45,7 +45,7 @@ class Second
     std::shared_ptr<valueNode> startFold(const std::shared_ptr<operatorNode>& v, std::string, bool );
     std::shared_ptr<valueNode> stringfolder(const std::shared_ptr<operatorNode>& node);
     void startIR(std::shared_ptr<Scope> s);
-    void boolhandling(std::vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i);
+    void boolhandling(std::vector<preToken>& buffer, std::string& name, const preToken& token);
     void functionDealer(std::vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i);
     void makeBool(std::vector<preToken>& buffer, BoolEnum);
     std::vector<preToken> paramCollector(std::vector<preToken>& buffer, int *position);

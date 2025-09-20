@@ -62,7 +62,13 @@ void Second::secondPass(){
             {
                 name = token.stringValue;
                 logic.setBool = true;
-                logic.inParams = true;
+                if (token.stringValue != "else")
+                {
+                    logic.inParams = true;
+                }
+                else{
+                    boolhandling(buffer, name, token);
+                }
             } 
             if (token.stringValue == "return")
             {
@@ -383,7 +389,7 @@ void Second::delimiterHandlign(vector<preToken>& buffer, std::string& name, Vari
     }
     if (logic.setBool == true && logic.inParams)
     {
-        boolhandling(buffer, name, activeVar, token, i);
+        boolhandling(buffer, name, token);
     }
     if (token.stringValue == ";" && logic.setvalue == true && logic.returningVlaue == false)
     {
@@ -519,8 +525,8 @@ void Second::functionDealer(vector<preToken>& buffer, std::string& name, Variabl
     }
 }
 
-void Second::boolhandling(vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i){
-    if(token.stringValue == ")"){
+void Second::boolhandling(vector<preToken>& buffer, std::string& name,const preToken& token){
+    if(token.stringValue == ")" || name == "else"){
         logic.collecting = false;
         if (name == "if")
         {
@@ -536,6 +542,7 @@ void Second::boolhandling(vector<preToken>& buffer, std::string& name, Variable&
                 makeBool(buffer, BoolEnum::Else_If);
             }
             else{
+                ir.pop_back();
                 std::shared_ptr<getBool> b = std::make_shared<getBool>();
                 b->type = BoolEnum::ELSE;
                 b->bscope = std::make_shared<Scope>(*scope);
@@ -543,6 +550,7 @@ void Second::boolhandling(vector<preToken>& buffer, std::string& name, Variable&
                 scope = b->bscope;
                 shared_ptr<ChangeScp> cs = make_shared<ChangeScp>();
                 cs->newScope = scope;
+                ir.push_back(b);
                 ir.push_back(cs);
             }
         }

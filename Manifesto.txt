@@ -1,91 +1,24 @@
-int dec(int n) { return n - 1; }
-int inc(int n) { return n + 1; }
-int div10(int n) { return n / 10; }
-int mod10(int n) { return n % 10; }
-int mul(int a, int b) { return a * b; }
-int add(int a, int b) { return a + b; }
-int sub(int a, int b) { return a - b; }
-int rem(int a, int b) { return a % b; }
-int quo(int a, int b) { return a / b; }
-int eq(int a, int b) { if (a == b){return 1;} return 0; }
-int leq(int a, int b) { if (a <= b){return 1;} return 0; }
-int less(int a, int b) { if (a < b){return 1;} return 0; }
-
-int factorial(int n) {
-    int cond = leq(n, 1);
-    if (cond == 1) { return 1; }
-    return mul(n, factorial(dec(n)));
+int c(int b){
+    if(b == 2 || b == 3){
+        b = b + 1;
+        c(b);
+    }
+    else if(b == 2){
+       b = 2;
+    }
+    else if(b == 100000){
+        b = 5;
+    }
+    else{
+        b = 3;
+    }
+    return c(c(b));
 }
 
-int sum_to_n(int n) {
-    int cond = leq(n, 0);
-    if (cond == 1) { return 0; }
-    return add(n, sum_to_n(dec(n)));
-}
-
-int power(int base, int exp) {
-    int cond = eq(exp, 0);
-    if (cond == 1) { return 1; }
-    return mul(base, power(base, dec(exp)));
-}
-
-int gcd(int a, int b) {
-    int cond = eq(b, 0);
-    if (cond == 1) { return a; }
-    return gcd(b, rem(a, b));
-}
-
-int fibonacci(int n) {
-    int cond = leq(n, 1);
-    if (cond == 1) { return n; }
-    return add(fibonacci(dec(n)), fibonacci(sub(n, 2)));
-}
-
-int digit_sum(int n) {
-    int cond = less(n, 10);
-    if (cond == 1) { return n; }
-    return add(mod10(n), digit_sum(div10(n)));
-}
-
-int digit_count(int n) {
-    int cond = less(n, 10);
-    if (cond == 1) { return 1; }
-    return inc(digit_count(div10(n)));
-}
-
-int reverse_number_helper(int n, int rev) {
-    int cond = eq(n, 0);
-    if (cond == 1){return rev;}
-    int d = mod10(n);
-    int r = add(mul(rev, 10), d);
-    return reverse_number_helper(div10(n), r);
-}
-
-int reverse_number(int n) {
-    return reverse_number_helper(n, 0);
-}
-
-int is_palindrome(int n) {
-    int cond = eq(n, reverse_number(n));
-    if (cond == 1) { return 1; }
-    return 0;
-}
-
-int lcm(int a, int b) {
-    int g = gcd(a, b);
-    return mul(quo(a, g), b);
-}
-
-int main() {
-    int a = factorial(5);
-    int b = sum_to_n(15);
-    int c = power(3, 6);
-    int d = gcd(84, 30);
-    int e = fibonacci(10);
-    int f = digit_sum(9876);
-    int g = digit_count(12345);
-    int h = reverse_number(4321);
-    int i = is_palindrome(1221);
-    int j = lcm(12, 18);
-    return 0;
+int main(){
+    int ghast = c(8);
+    int b = 2;
+    int o = 2;
+    int r = 2;
+    return ghast + b + o + r;
 }

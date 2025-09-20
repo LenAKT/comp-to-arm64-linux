@@ -57,7 +57,9 @@ class backEnd
     std::set<int> delteRegs;
     std::unordered_map<std::string, int> fReturns;
     std::vector<std::shared_ptr<IrNode>>* gIr;
+
     int labelCounter = 0;
+    int uSkip = -1;
 
     Reg STMregs{9, 16};
     Reg FuRegs{0,8};
