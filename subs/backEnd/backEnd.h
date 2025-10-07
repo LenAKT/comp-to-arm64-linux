@@ -37,7 +37,7 @@ class backEnd
     backEnd(std::shared_ptr<Scope> s): outerSCope(s) {
         std::cout << "in second " << std::endl;
         
-        pushFile.open("out.s", std::ios::trunc);
+        pushFile.open("Output.s", std::ios::trunc);
         pushFile << ".text" << std::endl;
         if (!pushFile)
         {

@@ -8,7 +8,7 @@
 int main(int argc, char const *argv[])
 {
     reading read;
-    read.setMemory("Manifesto.txt");
+    read.setMemory("CppInput.txt");
     read.reader();
     read.firstPass();
 
