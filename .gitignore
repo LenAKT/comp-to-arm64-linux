@@ -6,4 +6,5 @@
 *.d
 *.json
 *.py
-*/TrashCan
+Trashcan/
+build/
