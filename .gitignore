@@ -4,3 +4,6 @@
 # Ignore object/dependency files
 *.o
 *.d
+*.json
+*.py
+*/TrashCan

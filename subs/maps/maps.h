@@ -79,6 +79,12 @@ extern const std::unordered_map<std::string, std::string> arm64BoolOps;
 
 extern const std::unordered_map<std::string, std::string> arm64BoolOpsInverted;
 
+extern const std::unordered_map<int, std::string> arm64LoadOps;
+
+extern const std::unordered_map<int, std::string> arm64StoreOps;
+
+
+
 struct preToken
 {
     std::string stringValue;
@@ -91,12 +97,22 @@ struct Variable
     VarType type;
 };
 
+struct Stackinfo
+{
+    int lastSeen = 0;
+    int firstSeen = 0;
+    int bigestJump = 0;
+    int highestSeen = 0;
+    float Score = 0;
+};
+
 
 struct Cvar{
     ~Cvar() {}
     std::shared_ptr<valueNode> value;
     Variable var;
-    int lastSeen;
+    std::string name;
+    Stackinfo sInfo;
     int seen = 0;
     int reg = -1;
     bool is4byte = true;
@@ -129,6 +145,10 @@ struct Scope{
     std::unordered_map<std::string, std::shared_ptr<Cvar>> Cvars;
     std::shared_ptr<Scope> parentS;
 
+
+    bool inWhile;
+    int uSkip = -1;
+    int eCounter = 0;
     int emptyCounter;
 };
 
@@ -179,6 +199,7 @@ struct functionNode : valueNode
 {
     functionNode() {type = valueType::Func;}
     std::vector<preToken> paramVars;
+    std::string ownerName;
     std::string name;
     int* reg;
     void print() override{
@@ -210,6 +231,10 @@ enum class Instruction{
 struct IrNode{
     virtual ~IrNode() = default;
     Instruction instruction = Instruction::Error;
+    virtual std::shared_ptr<IrNode>  clone(){
+        auto copy = std::make_shared<IrNode>(*this);
+        return copy;
+    }
 };
 
 struct DeclareVar : IrNode{

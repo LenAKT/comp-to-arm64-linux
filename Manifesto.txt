@@ -1,24 +1,37 @@
-int c(int b){
-    if(b == 2 || b == 3){
-        b = b + 1;
-        c(b);
-    }
-    else if(b == 2){
-       b = 2;
-    }
-    else if(b == 100000){
-        b = 5;
-    }
-    else{
-        b = 3;
-    }
-    return c(c(b));
+int p(int a){
+    return a;
 }
-
+int l(int a, int b){
+    return a + b;
+}
 int main(){
-    int ghast = c(8);
-    int b = 2;
-    int o = 2;
-    int r = 2;
-    return ghast + b + o + r;
+   int rat = p(10); 
+   int a = p(1);
+   int b = p(2);
+   int c = p(3);
+   int d = p(4);
+   int e = p(5);
+   int f = p(6);
+   int g = p(7);
+   int h = p(8);
+   int i = p(9);
+   int j = p(10);
+   int bb = l(l(a,b),l(a,b));
+   int k = p(a + b + c + d + e + f + g + h + i + j);
+   if(rat == 10){
+        return a + b + c + d + e + f + g + h + i + j+ k + bb;
+   }
+   else if(rat == 20){
+        return 5;
+   }
+   else{
+        b = rat;
+        a = rat;
+        rat = 2;
+        if(a == 20){
+            b = 24;
+        }
+        return 10;
+   }
+   return b+rat + a;
 }

@@ -1,14 +1,15 @@
 
 
 CXX = g++
-CXXFLAGS = -std=c++17 -g -I./Subs -MMD -MP
+CXXFLAGS = -std=c++20 -g -I./Subs -MMD -MP
 ASAN_FLAGS = -fsanitize=address -g -O1
 
 SRC = main.cpp \
       subs/firstPass/reading.cpp \
       subs/maps/maps.cpp \
       subs/secondPass/second.cpp \
-	  subs/backEnd/backEnd.cpp
+	  subs/backEnd/backEnd.cpp \
+	  subs/stack/stack.cpp
 
 OBJ = $(SRC:.cpp=.o)
 DEP = $(OBJ:.o=.d)

@@ -8,7 +8,7 @@
 
 struct parseLogic
 {
-    bool setBool = false;
+    int  setBool = 0;
     bool collecting = false;
     bool runFunction = false;
     bool setvalue = false;
@@ -19,7 +19,10 @@ struct parseLogic
 class Second
 {
     public:
-    Second(std::shared_ptr<Scope>& s,const std::vector<preToken>& v, backEnd& b) : outerScope(s), preTokens(v), backend(b) {scope = outerScope;};
+    Second(std::shared_ptr<Scope>& s,const std::vector<preToken>& v, backEnd& b) : outerScope(s), preTokens(v), backend(b) 
+    {
+         scope = outerScope;
+    };
 
     void getNodeTree(Variable var,std::vector<preToken>& buffer, std::string name);
     void secondPass();
@@ -48,11 +51,12 @@ class Second
     void boolhandling(std::vector<preToken>& buffer, std::string& name, const preToken& token);
     void functionDealer(std::vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i);
     void makeBool(std::vector<preToken>& buffer, BoolEnum);
-    std::vector<preToken> paramCollector(std::vector<preToken>& buffer, int *position);
+    std::vector<preToken> paramCollector(std::vector<preToken>& buffer, int *position, std::shared_ptr<NFunction> n);
 
     void delimiterHandlign(std::vector<preToken>& buffer, std::string& name, Variable& activeVar,const preToken& token, int& i);
     std::shared_ptr<functionNode> functionHandling(std::vector<preToken>& b, std::shared_ptr<NFunction>& n, std::string );
     parseLogic logic;
+
     int fakeNum = 0;
 };
 

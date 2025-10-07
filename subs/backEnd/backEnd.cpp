@@ -52,71 +52,154 @@ void backEnd::Printer(std::shared_ptr<Scope> s){
 }
 
 void backEnd::start(std::vector<std::shared_ptr<IrNode>>* Ir){
-    // int d = 0;
-    // for (auto i : *Ir)
-    // {
-    //     if (i->instruction == Instruction::DecVar)
-    //     {
-    //        d++;
-    //     }
-    //     std::cout << toString(i->instruction) << " " << d+9 << std::endl;
-    // }
-    gIr = Ir;
-    int numberCounter;
-    for(auto& i : *Ir){
-        switch (i->instruction)
+    bool run = true;
+    std::shared_ptr<Scope> lastScope;
+    do{
+        int numberCounter;
+        gIr = Ir;
+        if (setStack)
         {
-        case Instruction::DecFunc:
-                makeFunction(std::static_pointer_cast<DeclareFunction>(i)->name);
-            break;
-        case Instruction::DecVar:{
-                auto d = std::static_pointer_cast<DeclareVar>(i);
-                if (d->toDeclare->seen > 0 || d->name == "return")
-                {
-                    makeVar(d->toDeclare, d->value, d->name);
-                }
-            break;}
-        case Instruction::RetValue:
-                cReg->regs[scope->Cvars["return"]->reg] = false;
-                moveToReg(scope->Cvars["return"], 0);
-                outFile << "ret" << std::endl;
-                clearRegs(&FuRegs);
-                clearRegs(&STMregs);
-            break;
-        case Instruction::ChangeSc:
-                scope = std::static_pointer_cast<ChangeScp>(i)->newScope;
-            break;
-        case Instruction::Arithma:{
-                auto d = std::static_pointer_cast<ArIr>(i);
-                // if (scope->Cvars[std::static_pointer_cast<operatorNode>(d->parent)->name]->seen > 0)
-                // {
-                ArithmaFunction(std::static_pointer_cast<ArIr>(i), std::static_pointer_cast<ArIr>(i)->isL);
-                // }
-            break;}
-        case Instruction::getFuncVal:{
+            for(auto i : laundry){
+                (*gIr)[i.position] = std::make_shared<ArIr>(i.savee);
+            }
+        }
+        for(auto& i : *Ir){
+            lastScope = scope;
+            switch (i->instruction)
+            {
+            case Instruction::DecFunc:
+                    makeFunction(std::static_pointer_cast<DeclareFunction>(i)->name);
+                break;
+            case Instruction::DecVar:{
+                    auto d = std::static_pointer_cast<DeclareVar>(i);
+                    if (d->toDeclare->seen > 0 || d->name == "return")
+                    {
+                        if (d->toDeclare->sInfo.firstSeen == 0)
+                        {
+                            d->toDeclare->sInfo.firstSeen = numberCounter;
+                        }
+                         
+                        makeVar(d->toDeclare, d->value, d->name);
+                    }
+                break;}
+            case Instruction::RetValue:
+                    cReg->regs[scope->Cvars["return"]->reg] = false;
+                    moveToReg(scope->Cvars["return"], 0);
+                    if (setStack)
+                    {
+                        outFile << "add sp, sp, #" << s->offset << std::endl;
+                    }
+                    
+                    outFile << "ret" << std::endl;
+                    clearRegs(&FuRegs);
+                    clearRegs(&STMregs);
+                break;
+            case Instruction::ChangeSc:
+                    lastScope = scope;
+                    scope = std::static_pointer_cast<ChangeScp>(i)->newScope;
+                    if(setStack){
+                        if (scopeSvs[scope].set == false)
+                        {
+                            scopeSvs[scope].set = true;
+                            scope->eCounter = scopeSvs[scope].e;
+                            scope->uSkip = scopeSvs[scope].u;
+                        }
+                    }
+                    else{
+                        ScopeSaver s;
+                        s.e = scope->eCounter;
+                        s.u = scope->uSkip;
+                        auto it = scopeSvs.find(scope);
+                        if (it == scopeSvs.end())
+                        {
+                            scopeSvs[scope] = s;
+                        }
+                        
+                    }
+                break;
+            case Instruction::Arithma:{
+                    auto d = std::static_pointer_cast<ArIr>(i);
+                    // if (scope->Cvars[std::static_pointer_cast<operatorNode>(d->parent)->name]->seen > 0)
+                    // {
+                    ArithmaFunction(std::static_pointer_cast<ArIr>(i), std::static_pointer_cast<ArIr>(i)->isL);
+                    // }
+                break;}
+            case Instruction::getFuncVal:{
                 int adr = findNextFree(cReg);
-               runner(i, adr);
-               std::static_pointer_cast<getFuncVal>(i)->reg = adr;
-            break;}
-        case Instruction::getBool:
-                boolFunction(std::static_pointer_cast<getBool>(i));
-              break;
-        case Instruction::boolReturn:
-            outFile << "skip" << (uSkip > 0 ? uSkip : labelCounter) <<":" << std::endl;
-            uSkip = -1;
-            labelCounter++;
-        case Instruction::DestoyFunc:
-            // scope->functionMap[std::static_pointer_cast<destroyFunc>(i)->name].reset();
-        default:
-            break;
+                runner(i, adr);
+                auto it = std::static_pointer_cast<getFuncVal>(i);
+                scope->Cvars[it->callerName]->reg = adr;
+                it->reg = adr;
+                moveToReg(scope->Cvars[it->callerName], adr);
+
+                break;}
+            case Instruction::getBool:
+                    boolFunction(std::static_pointer_cast<getBool>(i));
+                break;
+            case Instruction::boolReturn:{
+                if (scope->inWhile)
+                {
+                    outFile << "b loopStart" << scope->uSkip << std::endl;
+                    labelCounter++;
+                    scope->inWhile = false;
+                }
+                outFile << "skip" << scope->uSkip << ":" << std::endl;
+                labelCounter++;
+                break;
+            }
+            case Instruction::DestoyFunc:
+                // scope->functionMap[std::static_pointer_cast<destroyFunc>(i)->name].reset();
+            default:
+                break;
+            }
+            // for(auto d : clean){
+                    // std::cout << d->reg << " something important: " << d->seen << std::endl;
+            // }
+            cleanUp(numberCounter);
+            clean.clear();
+            numberCounter++;
         }
-        for(auto d : clean){
-            // std::cout << d->reg << " something important: " << d->seen << std::endl;
+        if (spillNR != 0 && setStack == false)
+        {
+            std::sort(StackScores.begin(), StackScores.end(), [](auto &a, auto &b){
+                return (*a.first) > (*b.first);
+            });
+            for(auto& i : StackScores){
+                std::cout << i.second << " Score: " << (*i.first) << std::endl; 
+            }
+            for(auto i : delteRegs){
+                if (i > 18)
+                {
+                    LTMregs.regs[i] = false;
+                }
+            }
+            makeStack(lastScope);
+            s->stackSetter(StackScores, spillNR+2); 
+            run = false;
+            for(auto i : lastScope->Cvars){
+                i.second->seen = i.second->sInfo.highestSeen;
+                if (i.second->reg > 18)
+                {
+                    LTMregs.regs[i.second->reg] = false;
+                }
+                i.second->reg = -1;
+            }
+            outFile.clear();
+            outFile.str("");
+            spillNR = 0;
+            labelCounter = 0;
+            clearRegs(&FuRegs);
+            clearRegs(&STMregs);
         }
-        cleanUp(numberCounter);
-        clean.clear();
-        numberCounter++;
+        else{
+            run = true;
+        }
     }
+    while(!run);
+    StackScores.clear();
+    pushFile << outFile.str();
+    outFile.str("");
+    outFile.clear();
 }
 
 void backEnd::runner(std::shared_ptr<IrNode> i, int newAdr){
@@ -134,10 +217,12 @@ void backEnd::runner(std::shared_ptr<IrNode> i, int newAdr){
             c->value = d;
             movFunc(Mode::intValue, c, 0);
             break;}
-        case TokenCategory::VARIABLE:
-            outFile << "mov x" << i << ", x" << scope->Cvars[s->params[i].stringValue]->reg << std::endl;
+        case TokenCategory::VARIABLE:{
+            std::string out = getRegValue(scope->Cvars[s->params[i].stringValue]);
+            outFile << "mov x" << i << ", " << out << std::endl;
             cleanPush(scope->Cvars[s->params[i].stringValue]);
             break;
+        }
         default:
             break;
         }
@@ -146,16 +231,37 @@ void backEnd::runner(std::shared_ptr<IrNode> i, int newAdr){
     clearRegs(&FuRegs);
     clearRegs(&STMregs);
     outFile << "mov x" << newAdr << ", x0" << std::endl;
-    scope->Cvars[s->callerName]->reg = newAdr;
 }
 
 void backEnd::moveToReg(std::shared_ptr<Cvar> var, int reg){
-    outFile << "mov " << (var->is4byte ? "w" : "x") << reg << ", " << (var->is4byte ? "w" : "x") << var->reg << std::endl;
+    if(setStack){
+        auto it = s->smap.find(var->name);
+        if (it != s->smap.end())
+        {
+            if (var->reg != reg)
+            {
+                outFile << "mov " << (var->is4byte ? "w" : "x") << reg 
+                << ", " << (var->is4byte ? "w" : "x") << var->reg << std::endl;
+            }
+            setRegVlaue(var->name);
+            cReg->regs[var->reg] = false;
+        }
+        else if(var->reg != reg)
+        {
+            std::string out = getRegValue(var);
+            outFile << "mov " << (var->is4byte ? "w" : "x") << reg << ", " << out << std::endl;
+        }
+    }
+    else if(var->reg != reg){
+        std::string out = getRegValue(var);
+        outFile << "mov " << (var->is4byte ? "w" : "x") << reg << ", " << out << std::endl;
+    }
 }
 
 void backEnd::makeVar(std::shared_ptr<Cvar> var, std::shared_ptr<valueNode> node, std::string name){
     var->value = node;
-    if (var->reg < 0)
+    cleanPush(var);
+    if (var->reg < 0 && var->value->type != valueType::Func)
     {
         var->reg = findNextFree(cReg);
     }
@@ -165,16 +271,18 @@ void backEnd::makeVar(std::shared_ptr<Cvar> var, std::shared_ptr<valueNode> node
         movFunc(Mode::intValue, var, 0);
     break;
     case valueType::Varible:
-        movFunc(Mode::varValue, var, scope->Cvars[std::static_pointer_cast<variableNode>(var->value)->name]->reg);
-        cleanPush(scope->Cvars[std::static_pointer_cast<variableNode>(var->value)->name]);
+        movFunc(Mode::varValue, var, scope->Cvars[std::static_pointer_cast<variableNode>(var->value)->name]);
     break;
     case valueType::Operator:
         break;
     case valueType::Func:
-        if (var->reg != *std::static_pointer_cast<functionNode>(var->value)->reg)
-        {
-            movFunc(Mode::varValue, var, *std::static_pointer_cast<functionNode>(var->value)->reg);
-        }
+            if (var->reg == -1)
+            {
+                var->reg = *std::static_pointer_cast<functionNode>(node)->reg;
+            }
+            else if(std::static_pointer_cast<functionNode>(node)->ownerName != var->name){
+                movFunc(Mode::varValue, var, scope->Cvars[std::static_pointer_cast<functionNode>(node)->ownerName]);
+            }
         break;
     default:
         break;
@@ -191,6 +299,10 @@ void backEnd::makeFunction(std::string name){
     }
     else{
         outFile << ".global " << name << "\n.type " << name << ", %function\n" << name << ":" << std::endl;
+    }
+    if (setStack == true)
+    {
+            outFile << "sub sp, sp, #" << s->offset << std::endl;
     }
     int in = 0;
     for (auto i : outerSCope->functionMap[name]->paramOrder){
@@ -216,8 +328,19 @@ int backEnd::findNextFree(Reg* r){
             return i;
         }
    }
+   if (spillNR > 0)
+   {
+        for (int i = r->end+1; i < r->end+spillNR; i++)
+        {
+            if (r->regs[i] == false)
+            {
+                r->regs[i] = true;
+                return i;
+            }
+        }
+   }
    spillNR++;
-   return -spillNR;
+   return r->end+spillNR;
 }
 
 void backEnd::forceTakeR(int a){
@@ -236,23 +359,26 @@ void backEnd::forceTakeR(int a){
     FuRegs.regs[a] = false;
 }
 
-void backEnd::movFunc(Mode mode, std::shared_ptr<Cvar> toVar,  int fromVar){
+void backEnd::movFunc(Mode mode, std::shared_ptr<Cvar> toVar,  std::shared_ptr<Cvar> fromVar){
     switch (mode)
     {
     case Mode::intValue:
             if(std::static_pointer_cast<intNode>(toVar->value)->value <= 65535){
-                outFile << "mov " << (toVar->is4byte ? "w" : "x") << toVar->reg << ", ";
+                std::string left = getRegValue(toVar);
+                outFile << "mov " << left << ", ";
                 outFile << "#" << std::static_pointer_cast<intNode>(toVar->value)->value << std::endl;
             }
             else{
-                outFile << "ldr " << (toVar->is4byte ? "w" : "x") << toVar->reg << ", ";
+                std::string left = getRegValue(toVar);
+                outFile << "ldr " << left << ", ";
                 outFile << "=" << std::static_pointer_cast<intNode>(toVar->value)->value << std::endl;
             }            
         break;
-    case Mode::varValue:
-            outFile << "mov " << (toVar->is4byte ? "w" : "x") << toVar->reg << ", ";
-            outFile << (toVar->is4byte ? "w" : "x") << fromVar << std::endl;
-        break;
+    case Mode::varValue:{
+            std::string left = getRegValue(toVar);
+            std::string right = getRegValue(fromVar);
+            outFile << "mov " << left << ", " << right << std::endl;
+        break;}
     default:
         break;
     }
@@ -270,11 +396,19 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
         re->reg = toReg;
         for (int i = 0; i < gIr->size(); i++)
         {
+    
             if ((*gIr)[i]->instruction == Instruction::Arithma && 
                 (std::static_pointer_cast<ArIr>((*gIr)[i])->l == ir->parent || 
                 std::static_pointer_cast<ArIr>((*gIr)[i])->r == ir->parent))
             {
                 auto s = std::static_pointer_cast<ArIr>((*gIr)[i]);
+                if(!setStack)
+                {
+                    cleanUP up;
+                    up.position = i;
+                    up.savee = *s;
+                    laundry.push_back(up);
+                }
                 if(isL){s->l = re;}
                 else{s->r = re;}
                 break;
@@ -297,6 +431,7 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
             auto s = scope->Cvars.find(std::static_pointer_cast<variableNode>(node)->name);
             if(s != scope->Cvars.end() && type == s->second->var.type)
             {
+                std::cout << s->second << std::endl;
                 *currentReg = s->second->reg;
                 i++;
                 return true;
@@ -308,12 +443,20 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
             }
         }
         else if(node->type == valueType::Func){
-            auto s = std::static_pointer_cast<functionNode>(node);
-            if(type == scope->functionMap[s->name]->returnType)
+            auto so = std::static_pointer_cast<functionNode>(node);
+            if(type == scope->functionMap[so->name]->returnType)
             {
-                *currentReg = *s->reg;
+                if (setStack)
+                {
+                    auto it = s->omap.find(so->ownerName);
+                    if (it != s->omap.end())
+                    {
+                        scope->Cvars[so->ownerName]->reg = pullFromStack(so->ownerName);
+                    }
+                }
+                cleanPush(scope->Cvars[so->ownerName]);
+                *currentReg = scope->Cvars[so->ownerName]->reg;
                 i++;
-                delteRegs.insert(*s->reg);
                 return true;
             }
             else{
@@ -348,7 +491,7 @@ void backEnd::ArithmaFunction(std::shared_ptr<ArIr> ir, bool isL){
             }
         }
         else if(node->type == valueType::regValue){
-            *currentReg = std::static_pointer_cast<regOnlyNode>(node)->reg;   
+            *currentReg = std::static_pointer_cast<regOnlyNode>(node)->reg;  
             i++;
             return true;  
         }
@@ -399,50 +542,52 @@ void backEnd::clearRegs(Reg* r){
     }
 }
 
-
 //må lagast på nytt når begyn å ta med parantesar funker dårli med blanding av && å ||
 void backEnd::boolFunction(std::shared_ptr<getBool> b){
-   int prevReg = -1;
-   bool inverted = true;
-   bool useTrueValF = false;
+    int prevReg = -1;
+    bool inverted = true;
+    bool useTrueValF = false;
     bool useTrueValS = false;
     int Fvalue;
     int Svalue;
    std::vector<int> delte;
+   auto getVal = [&](auto iNode, bool *trueV, int *value){
+        if(iNode != nullptr){cleanPush(iNode);}
+        else {std::cout << "massive error 2" << std::endl;}
+        if(iNode->reg < 0){
+            if (iNode->value->type == valueType::Intager && std::static_pointer_cast<intNode>(iNode->value)->value < 4096)
+            {
+                *trueV = true;
+                *value = std::static_pointer_cast<intNode>(iNode->value)->value;
+            }
+            else{
+                iNode->reg = findNextFree(&STMregs);
+                delte.push_back(iNode->reg);
+                movFunc(Mode::intValue, iNode, 0);
+            }
+        }
+   };
    switch (b->type)
    {
+   case BoolEnum::WHILE:
+        outFile << "loopStart" << labelCounter << ":" << std::endl;
+        b->type = BoolEnum::IF;
+        scope->inWhile = true;
+        boolFunction(b);
+        break;
    case BoolEnum::IF:
+        if (scope->uSkip == -1)
+        {
+            scope->uSkip = labelCounter;
+            labelCounter += scope->eCounter+1;
+        }
         for(auto i : b->subBools){
-            if(i.firstArg != nullptr){cleanPush(i.firstArg);}
-            else {std::cout << "massive error" << std::endl;}
-            if(i.secondArg != nullptr){cleanPush(i.secondArg);}
-            else {std::cout << "massive error 2" << std::endl;}
-            if(i.firstArg->reg < 0){
-                if (i.firstArg->value->type == valueType::Intager && std::static_pointer_cast<intNode>(i.firstArg->value)->value < 4096)
-                {
-                    useTrueValF = true;
-                    Fvalue = std::static_pointer_cast<intNode>(i.firstArg->value)->value;
-                }
-                else{
-                    i.firstArg->reg = findNextFree(&STMregs);
-                    delte.push_back(i.firstArg->reg);
-                    movFunc(Mode::intValue, i.firstArg, 0);
-                }
-            }
-            if(i.secondArg->reg < 0){
-                if (i.secondArg->value->type == valueType::Intager && std::static_pointer_cast<intNode>(i.secondArg->value)->value < 4096)
-                {
-                    useTrueValS = true;
-                    Svalue = std::static_pointer_cast<intNode>(i.secondArg->value)->value;
-                }
-                else{
-                    i.secondArg->reg = findNextFree(&STMregs);
-                    delte.push_back(i.secondArg->reg);
-                    movFunc(Mode::intValue, i.secondArg, 0);
-                }
-            }
-            outFile << "cmp " << (useTrueValF ? "#" : "w") << (useTrueValF ? Fvalue : i.firstArg->reg) 
-                    << ", " << (useTrueValS ? "#" : "w") << (useTrueValS ? Svalue : i.secondArg->reg) << std::endl;
+            getVal(i.firstArg, &useTrueValF, &Fvalue);
+            getVal(i.secondArg, &useTrueValS, &Svalue);
+            std::string Fout = (useTrueValF ? std::to_string(Fvalue) : getRegValue(i.firstArg));
+            std::string Sout = (useTrueValS ? std::to_string(Svalue) : getRegValue(i.secondArg));
+            outFile << "cmp " << (useTrueValF ? "#" : "") <<  Fout << ", " << (useTrueValS ? "#" : "") 
+            <<  Sout << std::endl;
             if (!i.nextCmpr.stringValue.empty())
             {
                 if (i.nextCmpr.stringValue == "||")
@@ -450,13 +595,13 @@ void backEnd::boolFunction(std::shared_ptr<getBool> b){
                     inverted = false;
                 }
                 auto g = arm64BoolOps.find(i.boolArg.stringValue);
-                outFile << "b." << g->second <<  (inverted ? " skip" : " goto") << labelCounter << std::endl;
+                outFile << "b." << g->second <<  (inverted ? " skip" : " goto") << scope->uSkip << std::endl;
             }
             else{
                 auto g = arm64BoolOpsInverted.find(i.boolArg.stringValue);
                 if (g != arm64BoolOpsInverted.end())
                 {
-                    outFile << "b." << g->second << " skip" << labelCounter << std::endl;
+                    outFile << "b." << g->second << " skip" << scope->uSkip << std::endl;
                 }
                 else{
                     std::cout << "Big error 124 " << i.boolArg.stringValue << " " << i.reg << std::endl;
@@ -465,22 +610,14 @@ void backEnd::boolFunction(std::shared_ptr<getBool> b){
         }
         if (!inverted)
         {
-                outFile << "goto" << labelCounter << ":" << std::endl;
+                outFile << "goto" << scope->uSkip << ":" << std::endl;
         }
     break;
-    case BoolEnum::ELSE: 
-        if (uSkip < 0)
-        {
-            uSkip = labelCounter + 1;
-            outFile << "b skip" << uSkip << std::endl;
-            outFile << "skip" << labelCounter << ":" << std::endl;
-            labelCounter += 2;
-        }
-        else{
-            outFile << "b skip" << uSkip << std::endl;
-            outFile << "skip" << labelCounter << ":" << std::endl;
-            labelCounter++;
-        }
+    case BoolEnum::ELSE:
+        outFile << "b skip" << std::to_string(scope->uSkip+scope->eCounter) << std::endl;
+        outFile << "skip" << scope->uSkip << ":" << std::endl;
+        scope->uSkip++;
+        scope->eCounter--;
     break;
    default:
     break;
@@ -492,10 +629,81 @@ void backEnd::boolFunction(std::shared_ptr<getBool> b){
 
 void backEnd::cleanUp(int i){
     for(auto& p : clean){
-        p->lastSeen = i;
+        bool firstSeen = false;
+        if (p->sInfo.lastSeen == 0)
+        {
+            firstSeen = true;
+            if (p->sInfo.firstSeen == 0)
+            {
+                 p->sInfo.firstSeen = i;
+            }
+            p->sInfo.lastSeen = i;
+        }
+
+        if (p->sInfo.bigestJump < i - p->sInfo.lastSeen)
+        {
+            p->sInfo.bigestJump = i - p->sInfo.lastSeen;
+        }
+        p->sInfo.lastSeen = i;
         if (p->seen <= 0)
         {
-            cReg->regs[p->reg] = false;
+            if (p->reg <= cReg->end && p->reg >= cReg->start)
+            {
+                cReg->regs[p->reg] = false;
+            }
+        }
+        p->sInfo.Score = (p->sInfo.bigestJump+1) / (p->sInfo.highestSeen + 1);
+        if (firstSeen)
+        {
+            std::pair<float*, std::string> stackPair;
+            stackPair.first = &p->sInfo.Score;
+            stackPair.second = p->name;
+            StackScores.push_back(stackPair);        
+        }
+        
+    }
+}
+
+std::string backEnd::getRegValue(std::shared_ptr<Cvar> var){
+    std::string out;
+    if (setStack)
+    {
+        auto it = s->omap.find(var->name);
+        if (it != s->omap.end())
+        {
+            auto prefix = arm64LoadOps.find(s->smap[var->name]);
+            int treg;
+            treg = findNextFree(cReg);
+            outFile << prefix->second  << (var->is4byte ? " w" : " x") << treg << ", [sp, #" 
+            <<  it->second << "]" << std::endl;
+            out = (var->is4byte ? "w" : "x") + std::to_string(treg);
+            cReg->regs[treg] = false;
+        }
+        else{
+            out = (var->is4byte ? "w" : "x") + std::to_string(var->reg);
         }
     }
+    else{
+        out = (var->is4byte ? "w" : "x") + std::to_string(var->reg);
+    }
+    return out;
+}
+
+void backEnd::setRegVlaue(std::string name){
+    auto dt = s->omap.find(name);
+    if(dt != s->omap.end()){
+        auto bt = arm64StoreOps.find(s->smap[name]);
+        outFile << bt->second << " x" << scope->Cvars[name]->reg << ", [sp, #" << dt->second << "]" << std::endl;
+        cReg->regs[scope->Cvars[name]->reg] = false;
+    }
+}
+
+int backEnd::pullFromStack(std::string name){
+    int out = findNextFree(cReg);
+    auto it = s->omap.find(name);
+    auto dt = s->smap.find(name);
+    auto m = arm64LoadOps.find(dt->second);
+    outFile << m->second << " w" << out << ", [sp, #" << it->second << "]" << std::endl;
+    delteRegs.insert(out);
+    return out;
 }

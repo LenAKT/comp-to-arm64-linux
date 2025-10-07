@@ -16,6 +16,5 @@ int main(int argc, char const *argv[])
 
     Second second(read.scope, read.preTokens, b);
     second.secondPass();
-
     return 0;
 }

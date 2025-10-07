@@ -112,3 +112,20 @@ const std::unordered_map<std::string, std::string> arm64BoolOps = {
     {"==", "eq"},   // branch if equal
     {"!=", "ne"}    // branch if not equal
 };
+
+const std::unordered_map<int, std::string> arm64LoadOps = {
+    {1, "ldrb"},   // load byte
+    {2, "ldrh"},   // load halfword (16-bit)
+    {4, "ldr"},    // load word (32-bit)
+    {8, "ldr"},    // load doubleword (64-bit)
+    {16, "ldp"}    // load pair of registers (8+8 bytes)
+};
+
+// Store instructions (size in bytes -> mnemonic)
+const std::unordered_map<int, std::string> arm64StoreOps = {
+    {1, "strb"},   // store byte
+    {2, "strh"},   // store halfword
+    {4, "str"},    // store word (32-bit)
+    {8, "str"},    // store doubleword (64-bit)
+    {16, "stp"}    // store pair of registers (8+8 bytes)
+};
